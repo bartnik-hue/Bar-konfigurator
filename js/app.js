@@ -333,10 +333,9 @@ class ArtbarApp {
 
         this.activeSocketClickContext = null;
         this.showContextMenu(e.clientX, e.clientY, 'Wstaw moduł na scenę', [
-            { key: 'BAR_STRAIGHT',     label: 'Moduł prosty baru (1.5m)', icon: '▮' },
-            { key: 'BAR_CORNER_RIGHT', label: 'Narożnik prawy 90°',       icon: '⌐' },
-            { key: 'BAR_CORNER_LEFT',  label: 'Narożnik lewy 90°',        icon: '⌙' },
-            { key: 'BACK_SHELF',       label: 'Regał zaplecza (1.5m)',    icon: '☲' },
+            { key: 'BAR_STRAIGHT',     label: 'Moduł prosty baru (1.5m)',   icon: '▮' },
+            { key: 'BAR_CORNER',       label: 'Narożnik 90°',               icon: '⌐' },
+            { key: 'BACK_SHELF',       label: 'Regał zaplecza (1.5m)',      icon: '☲' },
             { key: 'BACK_FRIDGE',      label: 'Lodówka przeszklona (1.0m)', icon: '🗄' }
         ]);
     }
@@ -344,16 +343,23 @@ class ArtbarApp {
     openSocketAttachMenu(clientX, clientY, parentModule, socketDef) {
         this.activeSocketClickContext = { parentModule, socketDef };
 
-        // Filtruj opcje do dozwolonych dla tego gniazda
+        // Filtruj opcje do dozwolonych dla tego gniazda (narożnik jest zunifikowany)
         const allOptions = [
             { key: 'BAR_STRAIGHT',     label: 'Dostaw prosty bar (1.5m)', icon: '▮' },
-            { key: 'BAR_CORNER_RIGHT', label: 'Dostaw narożnik prawy 90°', icon: '⌐' },
-            { key: 'BAR_CORNER_LEFT',  label: 'Dostaw narożnik lewy 90°',  icon: '⌙' },
+            { key: 'BAR_CORNER',       label: 'Dostaw narożnik 90°',      icon: '⌐' },
             { key: 'BACK_SHELF',       label: 'Dostaw regał zaplecza',    icon: '☲' },
             { key: 'BACK_FRIDGE',      label: 'Dostaw lodówkę',           icon: '🗄' }
         ];
 
-        const filtered = allOptions.filter(opt => socketDef.compatible.includes(opt.key));
+        const filtered = allOptions.filter(opt => {
+            if (opt.key === 'BAR_CORNER') {
+                return socketDef.compatible.includes('BAR_CORNER') ||
+                       socketDef.compatible.includes('BAR_CORNER_RIGHT') ||
+                       socketDef.compatible.includes('BAR_CORNER_LEFT');
+            }
+            return socketDef.compatible.includes(opt.key);
+        });
+
         this.showContextMenu(clientX, clientY, `Dołącz do: ${socketDef.label}`, filtered);
     }
 
@@ -430,9 +436,9 @@ class ArtbarApp {
     getModuleLabel(key) {
         switch (key) {
             case 'BAR_STRAIGHT':     return 'Bar Prosty';
+            case 'BAR_CORNER':
             case 'BAR_CORNER_RIGHT':
-            case 'BAR_CORNER':       return 'Narożnik Prawy 90°';
-            case 'BAR_CORNER_LEFT':  return 'Narożnik Lewy 90°';
+            case 'BAR_CORNER_LEFT':  return 'Narożnik 90°';
             case 'BACK_SHELF':       return 'Regał Zaplecza';
             case 'BACK_FRIDGE':      return 'Lodówka Eventowa';
             default: return key;
@@ -449,13 +455,9 @@ class ArtbarApp {
             this.barBuilder.startGhost('BAR_STRAIGHT');
             this.showToast('Wybrano Bar Prosty. Kliknij lewym przyciskiem myszy na siatce, aby go postawić. R - obrót, ESC - anuluj.');
         });
-        document.getElementById('btn-add-corner-right')?.addEventListener('click', () => {
-            this.barBuilder.startGhost('BAR_CORNER_RIGHT');
-            this.showToast('Wybrano Narożnik Prawy 90°. Kliknij lewym przyciskiem myszy na siatce, aby go postawić. R - obrót, ESC - anuluj.');
-        });
-        document.getElementById('btn-add-corner-left')?.addEventListener('click', () => {
-            this.barBuilder.startGhost('BAR_CORNER_LEFT');
-            this.showToast('Wybrano Narożnik Lewy 90°. Kliknij lewym przyciskiem myszy na siatce, aby go postawić. R - obrót, ESC - anuluj.');
+        document.getElementById('btn-add-corner')?.addEventListener('click', () => {
+            this.barBuilder.startGhost('BAR_CORNER');
+            this.showToast('Wybrano Narożnik 90°. Zbliż do złącza baru, aby dopasować stronę i kąt. R - obrót, ESC - anuluj.');
         });
         document.getElementById('btn-add-shelf')?.addEventListener('click', () => {
             this.barBuilder.startGhost('BACK_SHELF');

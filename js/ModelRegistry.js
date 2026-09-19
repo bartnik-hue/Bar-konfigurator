@@ -346,14 +346,14 @@ export class ModelRegistry {
                         label: 'Lewa strona (prosto lub róg w lewo)',
                         position: new THREE.Vector3(-halfW, 0.5, 0),
                         direction: new THREE.Vector3(-1, 0, 0),
-                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_LEFT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_LEFT', 'BAR_CORNER']
                     },
                     {
                         id: 'right',
                         label: 'Prawa strona (prosto lub róg w prawo)',
                         position: new THREE.Vector3(halfW, 0.5, 0),
                         direction: new THREE.Vector3(1, 0, 0),
-                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_RIGHT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_RIGHT', 'BAR_CORNER']
                     }
                 ];
 
@@ -365,14 +365,14 @@ export class ModelRegistry {
                         label: 'Wejście z lewej',
                         position: new THREE.Vector3(-halfW, 0.5, 0),
                         direction: new THREE.Vector3(-1, 0, 0),
-                        compatible: ['BAR_STRAIGHT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER']
                     },
                     {
                         id: 'out',
                         label: 'Wyjście zakrętu w prawo (90°)',
                         position: new THREE.Vector3(0, 0.5, -halfW),
                         direction: new THREE.Vector3(0, 0, -1),
-                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_RIGHT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_RIGHT', 'BAR_CORNER']
                     }
                 ];
 
@@ -384,14 +384,14 @@ export class ModelRegistry {
                         label: 'Wejście z prawej',
                         position: new THREE.Vector3(halfW, 0.5, 0),
                         direction: new THREE.Vector3(1, 0, 0),
-                        compatible: ['BAR_STRAIGHT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER']
                     },
                     {
                         id: 'out',
                         label: 'Wyjście zakrętu w lewo (90°)',
                         position: new THREE.Vector3(0, 0.5, -halfW),
                         direction: new THREE.Vector3(0, 0, -1),
-                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_LEFT']
+                        compatible: ['BAR_STRAIGHT', 'BAR_CORNER_LEFT', 'BAR_CORNER']
                     }
                 ];
 

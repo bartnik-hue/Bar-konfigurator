@@ -95,8 +95,7 @@
     <div class="bottom-controls">
         <span style="font-size: 0.72rem; color: var(--primary); font-weight: 600; text-transform: uppercase; margin-right: 2px;">Dodaj:</span>
         <button class="hud-btn" id="btn-add-straight" title="Postaw moduł prosty baru">＋ Bar Prosty</button>
-        <button class="hud-btn" id="btn-add-corner-right" title="Postaw narożnik prawy 90°">＋ Róg Prawy</button>
-        <button class="hud-btn" id="btn-add-corner-left" title="Postaw narożnik lewy 90°">＋ Róg Lewy</button>
+        <button class="hud-btn" id="btn-add-corner" title="Postaw narożnik 90° (automatyczne dopasowanie)">＋ Róg</button>
         <button class="hud-btn" id="btn-add-shelf" title="Postaw regał zaplecza">＋ Regał</button>
         <button class="hud-btn" id="btn-add-fridge" title="Postaw lodówkę przeszkloną">＋ Lodówka</button>
         <div class="hud-divider"></div>
@@ -126,13 +125,9 @@
             <span class="popup-item-icon">▮</span>
             <span>Moduł prosty baru (1.5m)</span>
         </div>
-        <div class="popup-item" data-choice="BAR_CORNER_RIGHT">
+        <div class="popup-item" data-choice="BAR_CORNER">
             <span class="popup-item-icon">⌐</span>
-            <span>Narożnik prawy 90°</span>
-        </div>
-        <div class="popup-item" data-choice="BAR_CORNER_LEFT">
-            <span class="popup-item-icon">⌙</span>
-            <span>Narożnik lewy 90°</span>
+            <span>Narożnik 90°</span>
         </div>
         <div class="popup-item" data-choice="BACK_SHELF">
             <span class="popup-item-icon">☲</span>
@@ -253,6 +248,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=13"></script>
+    <script type="module" src="js/app.js?v=14"></script>
 </body>
 </html>

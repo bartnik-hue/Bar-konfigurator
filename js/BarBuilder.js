@@ -298,15 +298,52 @@ export class BarBuilder {
     }
 
     /**
+     * Automatycznie rozpoznaje i dobiera odpowiedni wariant narożnika (prawy vs lewy)
+     * w zależności od modułu bazowego i wybranego gniazda połączeniowego
+     */
+    resolveCornerVariant(parentModule, socketDef, requestedKey) {
+        if (requestedKey !== 'BAR_CORNER') {
+            return requestedKey;
+        }
+
+        if (!parentModule || !socketDef) {
+            return 'BAR_CORNER_RIGHT';
+        }
+
+        // Gdy dołączamy do prostego baru:
+        if (parentModule.modelKey === 'BAR_STRAIGHT') {
+            if (socketDef.id === 'right') {
+                return 'BAR_CORNER_RIGHT'; // Prawa strona baru -> zakręt do środka w prawo
+            }
+            if (socketDef.id === 'left') {
+                return 'BAR_CORNER_LEFT';  // Lewa strona baru -> zakręt do środka w lewo
+            }
+        }
+
+        // Gdy dołączamy do istniejącego narożnika:
+        if (parentModule.modelKey === 'BAR_CORNER_RIGHT') {
+            return 'BAR_CORNER_RIGHT';
+        }
+        if (parentModule.modelKey === 'BAR_CORNER_LEFT') {
+            return 'BAR_CORNER_LEFT';
+        }
+
+        return 'BAR_CORNER_RIGHT';
+    }
+
+    /**
      * Oblicza docelową pozycję i kąt obrotu modułu dołączanego do danego gniazda
      */
     computeSocketAttachment(parentModule, socketDef, newModelKey) {
         const parentPos = parentModule.mesh.position;
         const parentRot = parentModule.mesh.rotation.y;
 
+        // Rozwiąż ogólny typ 'BAR_CORNER' na dedykowany wariant lewy lub prawy
+        const effectiveNewKey = this.resolveCornerVariant(parentModule, socketDef, newModelKey);
+
         // Wymiary z kalibracji
         const parentCal = this.registry.getCalibrationFor(parentModule.modelKey) || { width: 1.5 };
-        const newCal = this.registry.getCalibrationFor(newModelKey) || { width: 1.5 };
+        const newCal = this.registry.getCalibrationFor(effectiveNewKey) || { width: 1.5 };
 
         const parentWidth = parentCal.width || 1.5;
         const newWidth = newCal.width || 1.5;
@@ -366,16 +403,17 @@ export class BarBuilder {
             targetRot = parentRot;
         }
 
-        return { targetPos, targetRot };
+        return { targetPos, targetRot, resolvedKey: effectiveNewKey };
     }
 
     /**
      * Dołącza nowy moduł do wybranego gniazda (kropki)
      */
     attachModuleToSocket(parentModule, socketDef, newModelKey) {
-        const { targetPos, targetRot } = this.computeSocketAttachment(parentModule, socketDef, newModelKey);
+        const { targetPos, targetRot, resolvedKey } = this.computeSocketAttachment(parentModule, socketDef, newModelKey);
+        const effectiveKey = resolvedKey || newModelKey;
 
-        const newModule = this.addModule(newModelKey, targetPos, targetRot);
+        const newModule = this.addModule(effectiveKey, targetPos, targetRot);
         if (newModule) {
             newModule.attachedTo = {
                 parentModuleId: parentModule.id,
@@ -400,7 +438,16 @@ export class BarBuilder {
             const defs = this.registry.getSocketDefinitions(m.modelKey);
             for (const socketDef of defs) {
                 // Czy dany model może być podłączony do tego gniazda?
-                if (!socketDef.compatible || !socketDef.compatible.includes(modelKey)) {
+                const isCompatible = socketDef.compatible && (
+                    socketDef.compatible.includes(modelKey) ||
+                    (modelKey === 'BAR_CORNER' && (
+                        socketDef.compatible.includes('BAR_CORNER') ||
+                        socketDef.compatible.includes('BAR_CORNER_RIGHT') ||
+                        socketDef.compatible.includes('BAR_CORNER_LEFT')
+                    ))
+                );
+
+                if (!isCompatible) {
                     continue;
                 }
 
@@ -414,8 +461,8 @@ export class BarBuilder {
                     continue;
                 }
 
-                // Oblicz docelową pozycję modułu
-                const { targetPos, targetRot } = this.computeSocketAttachment(m, socketDef, modelKey);
+                // Oblicz docelową pozycję modułu i rozwiąż wariant
+                const { targetPos, targetRot, resolvedKey } = this.computeSocketAttachment(m, socketDef, modelKey);
 
                 // Sprawdź odległość kursora od gniazda lub od docelowej pozycji modułu
                 const distToSocket = cursorPoint.distanceTo(socketWorldPos);
@@ -429,6 +476,7 @@ export class BarBuilder {
                         socketDef: socketDef,
                         targetPos: targetPos,
                         targetRot: targetRot,
+                        resolvedKey: resolvedKey,
                         socketWorldPos: socketWorldPos,
                         distance: effectiveDist
                     };
@@ -450,7 +498,17 @@ export class BarBuilder {
         this.ghostRotation = 0;
         this.ghostSnapContext = null;
 
-        const mesh = this.registry.instantiate(modelKey);
+        const initialKey = (modelKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : modelKey;
+        this.createGhostMesh(initialKey);
+    }
+
+    createGhostMesh(meshKey) {
+        if (this.ghostModule) {
+            this.scene.remove(this.ghostModule);
+            this.ghostModule = null;
+        }
+
+        const mesh = this.registry.instantiate(meshKey);
         if (!mesh) return;
 
         // Ustaw półprzezroczysty materiał podglądu (ghost)
@@ -464,7 +522,24 @@ export class BarBuilder {
         });
 
         this.ghostModule = mesh;
+        this.currentGhostMeshKey = meshKey;
         this.scene.add(this.ghostModule);
+    }
+
+    switchGhostMesh(newMeshKey) {
+        if (!this.ghostModule || this.currentGhostMeshKey === newMeshKey) return;
+
+        const curPos = this.ghostModule.position.clone();
+        const curRot = this.ghostModule.rotation.y;
+        const isSnapped = !!this.ghostSnapContext;
+
+        this.createGhostMesh(newMeshKey);
+
+        if (this.ghostModule) {
+            this.ghostModule.position.copy(curPos);
+            this.ghostModule.rotation.y = curRot;
+            this.setGhostVisualSnap(isSnapped);
+        }
     }
 
     updateGhost(intersectPoint) {
@@ -475,11 +550,23 @@ export class BarBuilder {
 
         if (snapCandidate) {
             this.ghostSnapContext = snapCandidate;
+
+            // Jeśli przyciągnięty narożnik wymaga innego wariantu (lewy vs prawy), zamień siatkę
+            if (this.ghostModelKey === 'BAR_CORNER' && snapCandidate.resolvedKey && snapCandidate.resolvedKey !== this.currentGhostMeshKey) {
+                this.switchGhostMesh(snapCandidate.resolvedKey);
+            }
+
             this.ghostModule.position.copy(snapCandidate.targetPos);
             this.ghostModule.rotation.y = snapCandidate.targetRot;
             this.setGhostVisualSnap(true);
         } else {
             this.ghostSnapContext = null;
+
+            // Po wyjściu z pola przyciągania zresetuj narożnik do wariantu podstawowego
+            if (this.ghostModelKey === 'BAR_CORNER' && this.currentGhostMeshKey !== 'BAR_CORNER_RIGHT') {
+                this.switchGhostMesh('BAR_CORNER_RIGHT');
+            }
+
             // Swobodne pozycjonowanie na siatce 0.25m
             const snap = 0.25;
             const snappedX = Math.round(intersectPoint.x / snap) * snap;
@@ -513,13 +600,16 @@ export class BarBuilder {
         let mod = null;
         if (this.ghostSnapContext) {
             // Dołącz do przyciągniętego gniazda z pełnymi metadanymi i offsetem
-            const { parentModule, socketDef } = this.ghostSnapContext;
-            mod = this.attachModuleToSocket(parentModule, socketDef, this.ghostModelKey);
+            const { parentModule, socketDef, resolvedKey } = this.ghostSnapContext;
+            const keyToAttach = resolvedKey || this.ghostModelKey;
+            mod = this.attachModuleToSocket(parentModule, socketDef, keyToAttach);
         } else {
             // Postaw swobodnie na podłodze
             const pos = this.ghostModule.position.clone();
             const rot = this.ghostRotation;
-            const key = this.ghostModelKey;
+            const key = (this.ghostModelKey === 'BAR_CORNER')
+                ? (this.currentGhostMeshKey || 'BAR_CORNER_RIGHT')
+                : this.ghostModelKey;
             mod = this.addModule(key, pos, rot);
             if (mod) this.selectModule(mod);
         }
@@ -537,6 +627,7 @@ export class BarBuilder {
             this.scene.remove(this.ghostModule);
             this.ghostModule = null;
             this.ghostModelKey = null;
+            this.currentGhostMeshKey = null;
             this.ghostSnapContext = null;
         }
     }
