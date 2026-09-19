@@ -164,6 +164,9 @@ export class BarBuilder {
         };
 
         this.modules.push(moduleData);
+        if (this.onModuleAdded) {
+            this.onModuleAdded(moduleData);
+        }
         this.notifyChange();
         return moduleData;
     }

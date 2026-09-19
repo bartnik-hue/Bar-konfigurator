@@ -243,13 +243,38 @@ export class ModelRegistry {
                     child.material = child.material.clone();
                     child.material.side = THREE.DoubleSide;
                 }
-                if (child.name.includes('114') || child.name.includes('PLANSZA') || child.material?.name?.includes('logiem')) {
+                if (this.isBrandingTarget(child)) {
                     child.userData.isBrandingFront = true;
                 }
             }
         });
 
         return mirroredWrapper;
+    }
+
+    /**
+     * Rozpoznaje, czy dany element (materiał lub obiekt) jest frontem przeznaczonym na wymienną grafikę (branding)
+     */
+    isBrandingTarget(child) {
+        if (!child || !child.isMesh) return false;
+        const matName = (child.material?.name || '').toLowerCase();
+        const meshName = (child.name || '').toLowerCase();
+        const parentName = (child.parent?.name || '').toLowerCase();
+
+        // 1. Sprawdzenie nazwy materiału (rekomendowany standard: 'BRANDING', 'GRAFIKA', 'LOGO')
+        if (matName.includes('branding') || matName.includes('grafika') || 
+            matName.includes('logo') || matName.includes('plansza') || 
+            matName.includes('logiem')) {
+            return true;
+        }
+
+        // 2. Sprawdzenie nazwy obiektu / siatki w Blenderze ('BRANDING', 'PLANSZA')
+        if (meshName.includes('branding') || meshName.includes('plansza') ||
+            parentName.includes('branding') || parentName.includes('plansza')) {
+            return true;
+        }
+
+        return false;
     }
 
     setupShadowsAndMaterials(root, modelKey) {
@@ -259,9 +284,7 @@ export class ModelRegistry {
                 child.receiveShadow = true;
 
                 // Oznacz siatki frontowe dla brandingu
-                if (child.name.includes('PLANSZA') || child.name.includes('104') || 
-                    (child.parent && child.parent.name.includes('PLANSZA')) ||
-                    child.name.includes('114') || child.material?.name?.includes('logiem')) {
+                if (this.isBrandingTarget(child)) {
                     child.userData.isBrandingFront = true;
                 }
 

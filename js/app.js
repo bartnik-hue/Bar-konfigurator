@@ -19,6 +19,13 @@ class ArtbarApp {
         this.barBuilder = new BarBuilder(this.scene, this.camera, this.renderer, this.registry, (stats) => this.updateUIStats(stats));
         this.brandingManager = new BrandingManager(this.barBuilder);
 
+        // Automatyczne nakładanie bieżącego brandingu na nowo dodawane moduły
+        this.barBuilder.onModuleAdded = (moduleData) => {
+            if (this.brandingManager.currentTexture) {
+                this.brandingManager.applyToModule(moduleData, this.brandingManager.currentTexture);
+            }
+        };
+
         this.activeSocketClickContext = null;
 
         this.initEvents();
