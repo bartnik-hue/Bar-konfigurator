@@ -257,6 +257,7 @@ class ArtbarApp {
                 }
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
                 this.barBuilder.removeSelected();
+                this.hideRadialMenu();
             } else if (e.key === 'Escape') {
                 this.barBuilder.cancelGhost();
                 this.barBuilder.deselectModule();
@@ -585,11 +586,6 @@ class ArtbarApp {
             this.setCameraMode('orthographic');
             // Kąt aksonometryczny pod kątem 45°
             this.animateCamera(new THREE.Vector3(10, 8.5, 10), new THREE.Vector3(0, 0.5, 0));
-        });
-
-        document.getElementById('btn-delete-module')?.addEventListener('click', () => {
-            this.barBuilder.removeSelected();
-            this.hideRadialMenu();
         });
 
         // Obsługa przycisków menu półradialnego nad obiektem 3D
