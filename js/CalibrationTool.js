@@ -21,9 +21,9 @@ export class CalibrationTool {
                     <button class="hud-btn" data-model="barCornerLeft" style="font-size: 0.70rem; padding: 5px 3px;">Róg Lewy</button>
                     <button class="hud-btn" data-model="barStraight" style="font-size: 0.70rem; padding: 5px 3px;">Bar Prosty</button>
                     <button class="hud-btn" data-model="barCornerRightOut" style="font-size: 0.70rem; padding: 5px 3px; color: #FACB7D;" title="Offset baru dodawanego do rogu prawego">Róg P. ➔ Bar</button>
-                    <button class="hud-btn" data-model="barCornerLeftOut" style="font-size: 0.70rem; padding: 5px 3px; color: #FACB7D;" title="Offset baru dodawanego do rogu lewego">Róg L. ➔ Bar</button>
                     <button class="hud-btn" data-model="regal" style="font-size: 0.70rem; padding: 5px 3px;">Regał</button>
-                    <button class="hud-btn" data-model="fridge" style="font-size: 0.70rem; padding: 5px 3px;">Lodówka</button>
+                    <button class="hud-btn" data-model="fridge" style="font-size: 0.70rem; padding: 5px 3px;">Lodówka 2D</button>
+                    <button class="hud-btn" data-model="fridgeSlim" style="font-size: 0.70rem; padding: 5px 3px;">Lodówka 1D</button>
                     <button class="hud-btn" data-model="logoBarStraight" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na barze prostym">Logo Bar</button>
                 </div>
 
@@ -357,6 +357,7 @@ export class CalibrationTool {
             case 'barCornerLeftOut':    return [];
             case 'regal':               return ['BACK_SHELF'];
             case 'fridge':              return ['BACK_FRIDGE'];
+            case 'fridgeSlim':          return ['BACK_FRIDGE_SLIM'];
             default: return [];
         }
     }
@@ -369,7 +370,8 @@ export class CalibrationTool {
             case 'barCornerRightOut':   return 'Bar dodawany do Rogu Prawego';
             case 'barCornerLeftOut':    return 'Bar dodawany do Rogu Lewego';
             case 'regal':               return 'Regał Zaplecza (1.5m)';
-            case 'fridge':              return 'Lodówka Eventowa (1.0m)';
+            case 'fridge':              return 'Lodówka Eventowa 2D (1.0m)';
+            case 'fridgeSlim':          return 'Lodówka Eventowa 1D (0.5m)';
             case 'logoBarStraight':     return 'Logo: Bar Prosty';
             case 'logoCornerRight':     return 'Logo: Narożnik Prawy';
             case 'logoCornerLeft':      return 'Logo: Narożnik Lewy';

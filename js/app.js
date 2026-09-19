@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+window.THREE = THREE;
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { ModelRegistry } from './ModelRegistry.js';
@@ -378,10 +379,11 @@ class ArtbarApp {
 
         this.activeSocketClickContext = null;
         this.showContextMenu(e.clientX, e.clientY, 'Wstaw moduł na scenę', [
-            { key: 'BAR_STRAIGHT',     label: 'Moduł prosty baru (1.5m)',   icon: '▮' },
-            { key: 'BAR_CORNER',       label: 'Narożnik 90°',               icon: '⌐' },
-            { key: 'BACK_SHELF',       label: 'Regał zaplecza (1.5m)',      icon: '☲' },
-            { key: 'BACK_FRIDGE',      label: 'Lodówka przeszklona (1.0m)', icon: '🗄' }
+            { key: 'BAR_STRAIGHT',     label: 'Moduł prosty baru (1.5m)',        icon: '▮' },
+            { key: 'BAR_CORNER',       label: 'Narożnik 90°',                    icon: '⌐' },
+            { key: 'BACK_SHELF',       label: 'Regał zaplecza (1.5m)',           icon: '☲' },
+            { key: 'BACK_FRIDGE',      label: 'Lodówka przeszklona 2D (1.0m)',   icon: '🗄' },
+            { key: 'BACK_FRIDGE_SLIM', label: 'Lodówka przeszklona 1D (0.5m)',   icon: '🗄' }
         ]);
     }
 
@@ -393,7 +395,8 @@ class ArtbarApp {
             { key: 'BAR_STRAIGHT',     label: 'Dostaw prosty bar (1.5m)', icon: '▮' },
             { key: 'BAR_CORNER',       label: 'Dostaw narożnik 90°',      icon: '⌐' },
             { key: 'BACK_SHELF',       label: 'Dostaw regał zaplecza',    icon: '☲' },
-            { key: 'BACK_FRIDGE',      label: 'Dostaw lodówkę',           icon: '🗄' }
+            { key: 'BACK_FRIDGE',      label: 'Dostaw lodówkę 2D (1.0m)', icon: '🗄' },
+            { key: 'BACK_FRIDGE_SLIM', label: 'Dostaw lodówkę 1D (0.5m)', icon: '🗄' }
         ];
 
         const filtered = allOptions.filter(opt => {
@@ -485,7 +488,8 @@ class ArtbarApp {
             case 'BAR_CORNER_RIGHT':
             case 'BAR_CORNER_LEFT':  return 'Narożnik 90°';
             case 'BACK_SHELF':       return 'Regał Zaplecza';
-            case 'BACK_FRIDGE':      return 'Lodówka Eventowa';
+            case 'BACK_FRIDGE':      return 'Lodówka 2-drzwiowa (1.0m)';
+            case 'BACK_FRIDGE_SLIM': return 'Lodówka 1-drzwiowa (0.5m)';
             default: return key;
         }
     }
@@ -510,7 +514,11 @@ class ArtbarApp {
         });
         document.getElementById('btn-add-fridge')?.addEventListener('click', () => {
             this.barBuilder.startGhost('BACK_FRIDGE');
-            this.showToast('Wybrano Lodówkę przeszkloną. Kliknij lewym przyciskiem myszy na siatce, aby go postawić. R - obrót, ESC - anuluj.');
+            this.showToast('Wybrano Lodówkę przeszkloną 2D (1.0m). Kliknij lewym przyciskiem myszy na siatce, aby ją postawić. R - obrót, ESC - anuluj.');
+        });
+        document.getElementById('btn-add-fridge-slim')?.addEventListener('click', () => {
+            this.barBuilder.startGhost('BACK_FRIDGE_SLIM');
+            this.showToast('Wybrano Lodówkę przeszkloną 1D (0.5m). Kliknij lewym przyciskiem myszy na siatce, aby ją postawić. R - obrót, ESC - anuluj.');
         });
 
         // Przyciski widoków
@@ -839,13 +847,16 @@ class ArtbarApp {
         document.getElementById('stat-length').textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
         document.getElementById('stat-straight').textContent = `${stats.BAR_STRAIGHT} szt.`;
         document.getElementById('stat-corners').textContent = `${stats.BAR_CORNER} szt.`;
-        document.getElementById('stat-backbar').textContent = `${stats.BACK_SHELF} / ${stats.BACK_FRIDGE}`;
+        const totalFridges = (stats.BACK_FRIDGE || 0) + (stats.BACK_FRIDGE_SLIM || 0);
+        document.getElementById('stat-backbar').textContent = `${stats.BACK_SHELF} / ${totalFridges}`;
 
         // Panel podsumowania
         document.getElementById('sum-straight').textContent = `${stats.BAR_STRAIGHT} szt.`;
         document.getElementById('sum-corners').textContent = `${stats.BAR_CORNER} szt.`;
         document.getElementById('sum-shelves').textContent = `${stats.BACK_SHELF} szt.`;
         document.getElementById('sum-fridges').textContent = `${stats.BACK_FRIDGE} szt.`;
+        const sumFridgesSlim = document.getElementById('sum-fridges-slim');
+        if (sumFridgesSlim) sumFridgesSlim.textContent = `${stats.BACK_FRIDGE_SLIM || 0} szt.`;
         document.getElementById('sum-total-length').textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
     }
 

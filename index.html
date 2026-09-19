@@ -101,7 +101,8 @@
         <button class="hud-btn" id="btn-add-straight" title="Postaw moduł prosty baru">＋ Bar Prosty</button>
         <button class="hud-btn" id="btn-add-corner" title="Postaw narożnik 90° (automatyczne dopasowanie)">＋ Róg</button>
         <button class="hud-btn" id="btn-add-shelf" title="Postaw regał zaplecza">＋ Regał</button>
-        <button class="hud-btn" id="btn-add-fridge" title="Postaw lodówkę przeszkloną">＋ Lodówka</button>
+        <button class="hud-btn" id="btn-add-fridge" title="Postaw lodówkę przeszkloną dwudrzwiową (1.0m)">＋ Lodówka 2D</button>
+        <button class="hud-btn" id="btn-add-fridge-slim" title="Postaw lodówkę przeszkloną jednodrzwiową (0.5m)">＋ Lodówka 1D</button>
         <div class="hud-divider"></div>
         <button class="hud-btn active" id="btn-view-orbit">Widok 3D</button>
         <button class="hud-btn" id="btn-view-top">Rzut z góry</button>
@@ -139,7 +140,11 @@
         </div>
         <div class="popup-item" data-choice="BACK_FRIDGE">
             <span class="popup-item-icon">🗄</span>
-            <span>Lodówka przeszklona (1.0m)</span>
+            <span>Lodówka 2-drzwiowa (1.0m)</span>
+        </div>
+        <div class="popup-item" data-choice="BACK_FRIDGE_SLIM">
+            <span class="popup-item-icon">🗄</span>
+            <span>Lodówka 1-drzwiowa (0.5m)</span>
         </div>
     </div>
 
@@ -322,8 +327,12 @@
                     <strong class="stat-val" id="sum-shelves">0 szt.</strong>
                 </div>
                 <div class="calib-row">
-                    <span>Lodówka przeszklona podwójna:</span>
+                    <span>Lodówka przeszklona 2D (1.0m):</span>
                     <strong class="stat-val" id="sum-fridges">0 szt.</strong>
+                </div>
+                <div class="calib-row">
+                    <span>Lodówka przeszklona 1D (0.5m):</span>
+                    <strong class="stat-val" id="sum-fridges-slim">0 szt.</strong>
                 </div>
                 <div class="calib-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
                     <span style="color: var(--primary);">Łączna długość frontu baru:</span>
@@ -341,6 +350,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=20"></script>
+    <script type="module" src="js/app.js?v=21"></script>
 </body>
 </html>

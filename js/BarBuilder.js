@@ -61,6 +61,7 @@ export class BarBuilder {
             BAR_CORNER_LEFT: 0,
             BACK_SHELF: 0,
             BACK_FRIDGE: 0,
+            BACK_FRIDGE_SLIM: 0,
             totalFrontMeters: 0
         };
 
@@ -80,6 +81,8 @@ export class BarBuilder {
                 counts.BACK_SHELF++;
             } else if (m.modelKey === 'BACK_FRIDGE') {
                 counts.BACK_FRIDGE++;
+            } else if (m.modelKey === 'BACK_FRIDGE_SLIM') {
+                counts.BACK_FRIDGE_SLIM++;
             }
         });
 
@@ -208,7 +211,7 @@ export class BarBuilder {
         let height = 1.15;
         if (this.selectedModule.modelKey === 'BACK_SHELF') {
             height = 1.85;
-        } else if (this.selectedModule.modelKey === 'BACK_FRIDGE') {
+        } else if (this.selectedModule.modelKey === 'BACK_FRIDGE' || this.selectedModule.modelKey === 'BACK_FRIDGE_SLIM') {
             height = 1.95;
         }
         return new THREE.Vector3(pos.x, height, pos.z);

@@ -62,6 +62,13 @@ export class ModelRegistry {
                 offsetZ: 0.000,
                 rotY: 0
             },
+            fridgeSlim: {
+                width: 0.500,
+                offsetX: 0.000,
+                offsetY: 0.000,
+                offsetZ: 0.000,
+                rotY: 0
+            },
             logoBarStraight: {
                 width: 1.200,
                 height: 0.450,
@@ -173,11 +180,16 @@ export class ModelRegistry {
             }
         }
 
-        // 5. Wygeneruj model lodówki
+        // 5. Wygeneruj modele lodówek (dwudrzwiowa 1.0m oraz jednodrzwiowa Slim 0.5m)
         const fridgeRaw = FridgeGenerator.createFridgeModel();
         const fridgeCentered = this.createCenteredWrapper(fridgeRaw);
         this.templates.set('BACK_FRIDGE', fridgeCentered);
-        loadedCount++;
+
+        const fridgeSlimRaw = FridgeGenerator.createSingleFridgeModel();
+        const fridgeSlimCentered = this.createCenteredWrapper(fridgeSlimRaw);
+        this.templates.set('BACK_FRIDGE_SLIM', fridgeSlimCentered);
+
+        loadedCount += 2;
         if (onProgress) onProgress(1.0, 'Wszystkie modele gotowe');
     }
 
@@ -447,6 +459,8 @@ export class ModelRegistry {
             case 'regal':               return this.calibration.regal;
             case 'BACK_FRIDGE':         
             case 'fridge':              return this.calibration.fridge;
+            case 'BACK_FRIDGE_SLIM':
+            case 'fridgeSlim':          return this.calibration.fridgeSlim || { width: 0.500, offsetX: 0, offsetY: 0, offsetZ: 0, rotY: 0 };
             case 'logoBarStraight':     return this.calibration.logoBarStraight;
             case 'logoCornerRight':     return this.calibration.logoCornerRight;
             case 'logoCornerLeft':      return this.calibration.logoCornerLeft;
@@ -522,20 +536,21 @@ export class ModelRegistry {
 
             case 'BACK_SHELF':
             case 'BACK_FRIDGE':
+            case 'BACK_FRIDGE_SLIM':
                 return [
                     {
                         id: 'left',
                         label: 'Lewa strona',
                         position: new THREE.Vector3(-halfW, 0.9, 0),
                         direction: new THREE.Vector3(-1, 0, 0),
-                        compatible: ['BACK_SHELF', 'BACK_FRIDGE']
+                        compatible: ['BACK_SHELF', 'BACK_FRIDGE', 'BACK_FRIDGE_SLIM']
                     },
                     {
                         id: 'right',
                         label: 'Prawa strona',
                         position: new THREE.Vector3(halfW, 0.9, 0),
                         direction: new THREE.Vector3(1, 0, 0),
-                        compatible: ['BACK_SHELF', 'BACK_FRIDGE']
+                        compatible: ['BACK_SHELF', 'BACK_FRIDGE', 'BACK_FRIDGE_SLIM']
                     }
                 ];
 
