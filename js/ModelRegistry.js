@@ -91,9 +91,9 @@ export class ModelRegistry {
 
     async loadAllModels(onProgress) {
         const modelsToLoad = [
-            { key: 'BAR_STRAIGHT', url: '/MODELE/BarModel.glb', label: 'Moduł prosty baru' },
-            { key: 'RAW_CORNER',   url: '/MODELE/rog.glb',      label: 'Narożnik' },
-            { key: 'BACK_SHELF',   url: '/MODELE/regal.glb',    label: 'Regał zaplecza' }
+            { key: 'BAR_STRAIGHT', url: '/MODELE/BarModel.glb',     label: 'Moduł prosty baru' },
+            { key: 'RAW_CORNER',   url: '/MODELE/rog.glb?v=2',      label: 'Narożnik' },
+            { key: 'BACK_SHELF',   url: '/MODELE/regal.glb',        label: 'Regał zaplecza' }
         ];
 
         let loadedCount = 0;
