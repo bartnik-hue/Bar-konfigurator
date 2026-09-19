@@ -7,6 +7,7 @@ export class BrandingManager {
     constructor(barBuilder, registry = null) {
         this.barBuilder = barBuilder;
         this.registry = registry;
+        this.isEnabled = false;
         this.currentTexture = null;
         this.currentDataUrl = null;
         this.textureLoader = new THREE.TextureLoader();
@@ -51,6 +52,18 @@ export class BrandingManager {
         this.barBuilder.modules.forEach(moduleData => {
             this.applyToModule(moduleData, tex);
         });
+    setEnabled(enabled) {
+        this.isEnabled = !!enabled;
+        if (this.registry) {
+            this.registry.isLogoEnabled = this.isEnabled;
+        }
+        this.barBuilder.modules.forEach(moduleData => {
+            moduleData.mesh.traverse(child => {
+                if (child.isMesh && child.userData.isLogoPlane) {
+                    child.visible = this.isEnabled;
+                }
+            });
+        });
     }
 
     applyToModule(moduleData, texture) {
@@ -62,7 +75,7 @@ export class BrandingManager {
             if (child.isMesh && child.userData.isLogoPlane) {
                 child.material.map = tex;
                 child.material.needsUpdate = true;
-                child.visible = true;
+                child.visible = this.isEnabled;
             }
 
             // 2. Siatki frontowe oznaczone w materiale modelu GLB
@@ -92,6 +105,7 @@ export class BrandingManager {
                 if (child.isMesh && child.userData.isLogoPlane) {
                     child.material.map = defaultTex;
                     child.material.needsUpdate = true;
+                    child.visible = this.isEnabled;
                 }
                 if (child.isMesh && child.userData.isBrandingFront && child.userData.originalMaterial) {
                     child.material = child.userData.originalMaterial;

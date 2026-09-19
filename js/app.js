@@ -81,35 +81,71 @@ class ArtbarApp {
     }
 
     initLights() {
+        // Parametry położenia światła sferycznego
+        this.lightDistance = 18.0;
+        this.lightAzimuth = 38; // stopnie
+        this.lightElevation = 55; // stopnie
+
         // Oświetlenie studyjne dopasowane do ciemnych satynowych mebli Artbar
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        this.scene.add(ambientLight);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        this.scene.add(this.ambientLight);
 
         // Główne światło kierunkowe z cieniami
-        const mainLight = new THREE.DirectionalLight(0xfffaed, 2.2);
-        mainLight.position.set(8, 14, 10);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 2048;
-        mainLight.shadow.mapSize.height = 2048;
-        mainLight.shadow.camera.near = 0.5;
-        mainLight.shadow.camera.far = 40;
+        this.mainLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+        this.mainLight.castShadow = true;
+        this.mainLight.shadow.mapSize.width = 2048;
+        this.mainLight.shadow.mapSize.height = 2048;
+        this.mainLight.shadow.camera.near = 0.5;
+        this.mainLight.shadow.camera.far = 40;
         const d = 12;
-        mainLight.shadow.camera.left = -d;
-        mainLight.shadow.camera.right = d;
-        mainLight.shadow.camera.top = d;
-        mainLight.shadow.camera.bottom = -d;
-        mainLight.shadow.bias = -0.0004;
-        this.scene.add(mainLight);
+        this.mainLight.shadow.camera.left = -d;
+        this.mainLight.shadow.camera.right = d;
+        this.mainLight.shadow.camera.top = d;
+        this.mainLight.shadow.camera.bottom = -d;
+        this.mainLight.shadow.bias = -0.0004;
+        this.updateMainLightPosition();
+        this.scene.add(this.mainLight);
 
         // Ciepłe złote światło konturowe (rim light z tyłu)
-        const goldRimLight = new THREE.DirectionalLight(0xFACB7D, 1.4);
-        goldRimLight.position.set(-10, 8, -10);
-        this.scene.add(goldRimLight);
+        this.goldRimLight = new THREE.DirectionalLight(0xFACB7D, 1.4);
+        this.goldRimLight.position.set(-10, 8, -10);
+        this.scene.add(this.goldRimLight);
 
         // Wypełniające chłodne światło z boku
-        const fillLight = new THREE.DirectionalLight(0xd5e2f0, 0.8);
-        fillLight.position.set(-8, 5, 8);
-        this.scene.add(fillLight);
+        this.fillLight = new THREE.DirectionalLight(0xd5e2f0, 0.8);
+        this.fillLight.position.set(-8, 5, 8);
+        this.scene.add(this.fillLight);
+    }
+
+    updateMainLightPosition() {
+        if (!this.mainLight) return;
+        const azRad = this.lightAzimuth * (Math.PI / 180);
+        const elRad = this.lightElevation * (Math.PI / 180);
+
+        const rGround = this.lightDistance * Math.cos(elRad);
+        const y = this.lightDistance * Math.sin(elRad);
+        const x = rGround * Math.sin(azRad);
+        const z = rGround * Math.cos(azRad);
+
+        this.mainLight.position.set(x, y, z);
+    }
+
+    setSceneBackgroundColor(hex) {
+        const color = new THREE.Color(hex);
+        this.scene.background = color;
+        if (this.scene.fog) {
+            this.scene.fog.color = color;
+        }
+
+        // Dostosowanie posadzki i siatki przy bardzo jasnych kolorach tła
+        const lum = (color.r * 0.299 + color.g * 0.587 + color.b * 0.114);
+        if (lum > 0.6) {
+            if (this.floorMesh?.material) this.floorMesh.material.color.set(0xcccccc);
+            if (this.grid?.material) this.grid.material.color.set(0x888888);
+        } else {
+            if (this.floorMesh?.material) this.floorMesh.material.color.set(0x171717);
+            if (this.grid?.material) this.grid.material.color.set(0xFACB7D);
+        }
     }
 
     initEnvironment() {
@@ -120,15 +156,15 @@ class ArtbarApp {
             roughness: 0.5,
             metalness: 0.2
         });
-        const floorMesh = new THREE.Mesh(floorGeom, floorMat);
-        floorMesh.rotation.x = -Math.PI / 2;
-        floorMesh.receiveShadow = true;
-        this.scene.add(floorMesh);
+        this.floorMesh = new THREE.Mesh(floorGeom, floorMat);
+        this.floorMesh.rotation.x = -Math.PI / 2;
+        this.floorMesh.receiveShadow = true;
+        this.scene.add(this.floorMesh);
 
         // Siatka podłogowa (Grid)
-        const grid = new THREE.GridHelper(40, 40, 0xFACB7D, 0x2e2e2e);
-        grid.position.y = 0.005;
-        this.scene.add(grid);
+        this.grid = new THREE.GridHelper(40, 40, 0xFACB7D, 0x2e2e2e);
+        this.grid.position.y = 0.005;
+        this.scene.add(this.grid);
     }
 
     async loadModels() {
@@ -583,10 +619,16 @@ class ArtbarApp {
                         this.brandingManager.loadGraphicFromDataUrl(savedBitmap, (dataUrl) => {
                             document.getElementById('branding-preview-img').src = dataUrl;
                             document.getElementById('branding-preview-box').style.display = 'flex';
+                            const toggle = document.getElementById('branding-enable-toggle');
+                            if (toggle) toggle.checked = true;
+                            this.brandingManager.setEnabled(true);
                         });
                         this.showToast('Układ oraz wgrana grafika zostały pomyślnie wczytane!');
                     } else {
                         this.brandingManager.resetBranding();
+                        const toggle = document.getElementById('branding-enable-toggle');
+                        if (toggle) toggle.checked = false;
+                        this.brandingManager.setEnabled(false);
                         document.getElementById('branding-preview-box').style.display = 'none';
                         this.showToast('Układ baru został pomyślnie wczytany!');
                     }
@@ -601,6 +643,7 @@ class ArtbarApp {
         // Panele boczne
         this.setupSidePanel('btn-open-presets', 'panel-presets');
         this.setupSidePanel('btn-open-branding', 'panel-branding');
+        this.setupSidePanel('btn-open-scene-settings', 'panel-scene-settings');
         this.setupSidePanel('btn-open-calib', 'panel-calibration');
         this.setupSidePanel('btn-open-summary', 'panel-summary');
 
@@ -611,6 +654,17 @@ class ArtbarApp {
                 this.barBuilder.loadPreset(preset);
                 this.showToast(`Załadowano preset: ${card.querySelector('.preset-name').textContent}`);
             });
+        });
+
+        // Branding Toggle Switch
+        const brandingToggle = document.getElementById('branding-enable-toggle');
+        brandingToggle?.addEventListener('change', (e) => {
+            this.brandingManager.setEnabled(e.target.checked);
+            if (e.target.checked) {
+                this.showToast('Włączono branding / logo na barze prostym.');
+            } else {
+                this.showToast('Ukryto grafikę brandingu.');
+            }
         });
 
         // Branding Upload
@@ -642,6 +696,11 @@ class ArtbarApp {
         });
 
         document.getElementById('btn-apply-branding').addEventListener('click', () => {
+            const toggle = document.getElementById('branding-enable-toggle');
+            if (toggle && !toggle.checked) {
+                toggle.checked = true;
+                this.brandingManager.setEnabled(true);
+            }
             this.brandingManager.applyToAllFronts();
             this.showToast('Zastosowano grafikę do wszystkich frontów baru.');
         });
@@ -649,7 +708,59 @@ class ArtbarApp {
         document.getElementById('btn-reset-branding').addEventListener('click', () => {
             this.brandingManager.resetBranding();
             document.getElementById('branding-preview-box').style.display = 'none';
-            this.showToast('Przywrócono domyślny wygląd frontów.');
+            this.showToast('Przywrócono domyślny wzór frontów.');
+        });
+
+        // Ustawienia Sceny (Tło, Światło, Kierunek)
+        document.querySelectorAll('.color-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                const col = chip.dataset.color;
+                const customInput = document.getElementById('scene-bg-custom');
+                if (customInput) customInput.value = col;
+                this.setSceneBackgroundColor(col);
+            });
+        });
+
+        const bgCustomInput = document.getElementById('scene-bg-custom');
+        bgCustomInput?.addEventListener('input', (e) => {
+            document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+            this.setSceneBackgroundColor(e.target.value);
+        });
+
+        const lightMainSlider = document.getElementById('scene-light-main');
+        const valLightMain = document.getElementById('val-light-main');
+        lightMainSlider?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (valLightMain) valLightMain.textContent = val.toFixed(1);
+            if (this.mainLight) this.mainLight.intensity = val;
+        });
+
+        const lightAmbientSlider = document.getElementById('scene-light-ambient');
+        const valLightAmbient = document.getElementById('val-light-ambient');
+        lightAmbientSlider?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (valLightAmbient) valLightAmbient.textContent = val.toFixed(1);
+            if (this.ambientLight) this.ambientLight.intensity = val;
+        });
+
+        const lightAzimuthSlider = document.getElementById('scene-light-azimuth');
+        const valLightAzimuth = document.getElementById('val-light-azimuth');
+        lightAzimuthSlider?.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.lightAzimuth = val;
+            if (valLightAzimuth) valLightAzimuth.textContent = `${val}°`;
+            this.updateMainLightPosition();
+        });
+
+        const lightElevationSlider = document.getElementById('scene-light-elevation');
+        const valLightElevation = document.getElementById('val-light-elevation');
+        lightElevationSlider?.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            this.lightElevation = val;
+            if (valLightElevation) valLightElevation.textContent = `${val}°`;
+            this.updateMainLightPosition();
         });
 
         // Drukuj zestawienie
@@ -662,7 +773,12 @@ class ArtbarApp {
         this.brandingManager.loadGraphicFromFile(file, (dataUrl) => {
             document.getElementById('branding-preview-img').src = dataUrl;
             document.getElementById('branding-preview-box').style.display = 'flex';
-            this.showToast('Wgrano grafikę i zaktualizowano fronty modułów!');
+            const toggle = document.getElementById('branding-enable-toggle');
+            if (toggle && !toggle.checked) {
+                toggle.checked = true;
+                this.brandingManager.setEnabled(true);
+            }
+            this.showToast('Wgrano grafikę i zaktualizowano fronty baru!');
         });
     }
 

@@ -25,8 +25,6 @@ export class CalibrationTool {
                     <button class="hud-btn" data-model="regal" style="font-size: 0.70rem; padding: 5px 3px;">Regał</button>
                     <button class="hud-btn" data-model="fridge" style="font-size: 0.70rem; padding: 5px 3px;">Lodówka</button>
                     <button class="hud-btn" data-model="logoBarStraight" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na barze prostym">Logo Bar</button>
-                    <button class="hud-btn" data-model="logoCornerRight" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na rogu prawym">Logo Róg P.</button>
-                    <button class="hud-btn" data-model="logoCornerLeft" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na rogu lewym">Logo Róg L.</button>
                 </div>
 
                 <div class="calib-group" style="background: rgba(20, 20, 24, 0.95); border: 1px solid rgba(250, 203, 125, 0.2); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 12px;">

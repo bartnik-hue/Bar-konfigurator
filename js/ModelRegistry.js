@@ -90,6 +90,7 @@ export class ModelRegistry {
 
         this.placeholderLogoTexture = null;
         this.activeLogoTexture = null;
+        this.isLogoEnabled = false;
         this.loadPlaceholderTexture();
 
         this.calibration = this.loadCalibration();
@@ -367,8 +368,8 @@ export class ModelRegistry {
 
         wrapper.add(pivotNode);
 
-        // Jeśli moduł to bar (prosty lub narożnik), dodaj dedykowany plane na logo
-        if (effectiveKey === 'BAR_STRAIGHT' || effectiveKey === 'BAR_CORNER_RIGHT' || effectiveKey === 'BAR_CORNER_LEFT') {
+        // Dodaj dedykowany plane na logo wyłącznie dla baru prostego (BAR_STRAIGHT)
+        if (effectiveKey === 'BAR_STRAIGHT') {
             const logoPlane = this.createLogoPlane(effectiveKey);
             if (logoPlane) {
                 wrapper.add(logoPlane);
@@ -380,8 +381,6 @@ export class ModelRegistry {
 
     getLogoCalibrationKey(modelKey) {
         if (modelKey === 'BAR_STRAIGHT') return 'logoBarStraight';
-        if (modelKey === 'BAR_CORNER_RIGHT' || modelKey === 'BAR_CORNER') return 'logoCornerRight';
-        if (modelKey === 'BAR_CORNER_LEFT') return 'logoCornerLeft';
         return null;
     }
 
@@ -390,7 +389,7 @@ export class ModelRegistry {
         if (!calKey) return null;
 
         const cal = this.calibration[calKey] || {};
-        const width = cal.width || (modelKey === 'BAR_STRAIGHT' ? 1.20 : 0.70);
+        const width = cal.width || 1.20;
         const height = cal.height || 0.45;
 
         const geom = new THREE.PlaneGeometry(width, height);
@@ -411,6 +410,7 @@ export class ModelRegistry {
         mesh.userData.logoKey = calKey;
         mesh.position.set(cal.offsetX || 0, cal.offsetY !== undefined ? cal.offsetY : 0.55, cal.offsetZ !== undefined ? cal.offsetZ : 0.225);
         mesh.rotation.y = (cal.rotY || 0) * (Math.PI / 180);
+        mesh.visible = this.isLogoEnabled === true;
 
         return mesh;
     }
