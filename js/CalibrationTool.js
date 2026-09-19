@@ -24,6 +24,9 @@ export class CalibrationTool {
                     <button class="hud-btn" data-model="barCornerLeftOut" style="font-size: 0.70rem; padding: 5px 3px; color: #FACB7D;" title="Offset baru dodawanego do rogu lewego">Róg L. ➔ Bar</button>
                     <button class="hud-btn" data-model="regal" style="font-size: 0.70rem; padding: 5px 3px;">Regał</button>
                     <button class="hud-btn" data-model="fridge" style="font-size: 0.70rem; padding: 5px 3px;">Lodówka</button>
+                    <button class="hud-btn" data-model="logoBarStraight" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na barze prostym">Logo Bar</button>
+                    <button class="hud-btn" data-model="logoCornerRight" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na rogu prawym">Logo Róg P.</button>
+                    <button class="hud-btn" data-model="logoCornerLeft" style="font-size: 0.70rem; padding: 5px 3px; color: #60a5fa;" title="Pozycja i rozmiar logo na rogu lewym">Logo Róg L.</button>
                 </div>
 
                 <div class="calib-group" style="background: rgba(20, 20, 24, 0.95); border: 1px solid rgba(250, 203, 125, 0.2); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
@@ -34,16 +37,33 @@ export class CalibrationTool {
                     <!-- SZEROKOŚĆ / WIDTH -->
                     <div class="calib-param" data-param="width">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <label style="font-size: 0.75rem; color: #ccc;">Szerokość modułu (W):</label>
+                            <label style="font-size: 0.75rem; color: #ccc;">Szerokość (W):</label>
                             <input type="number" id="cal-num-width" min="0.1" max="4.0" step="0.001" style="width: 75px; text-align: right; background: #111; color: #FACB7D; border: 1px solid #444; border-radius: 4px; padding: 2px 4px; font-size: 0.75rem; font-family: monospace;">
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="range" id="cal-width" min="0.4" max="3.0" step="0.001" style="flex: 1;">
+                            <input type="range" id="cal-width" min="0.2" max="3.0" step="0.001" style="flex: 1;">
                             <div class="micro-buttons" style="display: flex; gap: 3px;">
                                 <button class="btn-micro" data-param="width" data-delta="-0.010" title="-10 mm">-10</button>
                                 <button class="btn-micro" data-param="width" data-delta="-0.001" title="-1 mm">-1</button>
                                 <button class="btn-micro" data-param="width" data-delta="0.001" title="+1 mm">+1</button>
                                 <button class="btn-micro" data-param="width" data-delta="0.010" title="+10 mm">+10</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WYSOKOŚĆ / HEIGHT (dla płaszczyzn logo) -->
+                    <div class="calib-param" data-param="height" id="calib-param-height" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <label style="font-size: 0.75rem; color: #ccc;">Wysokość (H):</label>
+                            <input type="number" id="cal-num-height" min="0.05" max="3.0" step="0.001" style="width: 75px; text-align: right; background: #111; color: #FACB7D; border: 1px solid #444; border-radius: 4px; padding: 2px 4px; font-size: 0.75rem; font-family: monospace;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="range" id="cal-height" min="0.05" max="2.0" step="0.001" style="flex: 1;">
+                            <div class="micro-buttons" style="display: flex; gap: 3px;">
+                                <button class="btn-micro" data-param="height" data-delta="-0.010" title="-10 mm">-10</button>
+                                <button class="btn-micro" data-param="height" data-delta="-0.001" title="-1 mm">-1</button>
+                                <button class="btn-micro" data-param="height" data-delta="0.001" title="+1 mm">+1</button>
+                                <button class="btn-micro" data-param="height" data-delta="0.010" title="+10 mm">+10</button>
                             </div>
                         </div>
                     </div>
@@ -150,10 +170,11 @@ export class CalibrationTool {
             });
         });
 
-        const params = ['width', 'ox', 'oy', 'oz', 'rot'];
+        const params = ['width', 'height', 'ox', 'oy', 'oz', 'rot'];
         params.forEach(param => {
             const range = this.container.querySelector(`#cal-${param}`);
             const num = this.container.querySelector(`#cal-num-${param}`);
+            if (!range || !num) return;
 
             range.addEventListener('input', () => {
                 num.value = range.value;
@@ -174,6 +195,7 @@ export class CalibrationTool {
                 const delta = parseFloat(btn.dataset.delta);
                 const num = this.container.querySelector(`#cal-num-${param}`);
                 const range = this.container.querySelector(`#cal-${param}`);
+                if (!num || !range) return;
 
                 let currentVal = parseFloat(num.value) || 0;
                 let newVal = currentVal + delta;
@@ -215,7 +237,14 @@ export class CalibrationTool {
         const cal = this.registry.calibration[key] || {};
         this.container.querySelector('#calib-model-title').textContent = `Kalibracja: ${this.getModelLabel(key)}`;
         
+        const isLogo = key.startsWith('logo');
+        const heightParam = this.container.querySelector('#calib-param-height');
+        if (heightParam) {
+            heightParam.style.display = isLogo ? 'block' : 'none';
+        }
+
         this.setVal('width', cal.width ?? 1.5);
+        this.setVal('height', cal.height ?? 0.45);
         this.setVal('ox', cal.offsetX ?? 0);
         this.setVal('oy', cal.offsetY ?? 0);
         this.setVal('oz', cal.offsetZ ?? 0);
@@ -233,6 +262,7 @@ export class CalibrationTool {
     handleValueChange() {
         const key = this.currentModelKey;
         const width = parseFloat(this.container.querySelector('#cal-num-width').value) || 0;
+        const height = parseFloat(this.container.querySelector('#cal-num-height')?.value) || 0.45;
         const ox = parseFloat(this.container.querySelector('#cal-num-ox').value) || 0;
         const oy = parseFloat(this.container.querySelector('#cal-num-oy').value) || 0;
         const oz = parseFloat(this.container.querySelector('#cal-num-oz').value) || 0;
@@ -240,6 +270,7 @@ export class CalibrationTool {
 
         this.registry.calibration[key] = {
             width: Math.round(width * 1000) / 1000,
+            height: Math.round(height * 1000) / 1000,
             offsetX: Math.round(ox * 1000) / 1000,
             offsetY: Math.round(oy * 1000) / 1000,
             offsetZ: Math.round(oz * 1000) / 1000,
@@ -251,6 +282,28 @@ export class CalibrationTool {
 
     applyLiveChanges() {
         const key = this.currentModelKey;
+
+        // Obsługa kalibracji pozycji i rozmiaru logo na barach
+        if (key.startsWith('logo')) {
+            const cal = this.registry.calibration[key] || {};
+            const targetModKey = (key === 'logoBarStraight') ? 'BAR_STRAIGHT' :
+                                 (key === 'logoCornerRight') ? 'BAR_CORNER_RIGHT' : 'BAR_CORNER_LEFT';
+
+            this.barBuilder.modules.forEach(m => {
+                if (m.modelKey === targetModKey || (targetModKey === 'BAR_CORNER_RIGHT' && m.modelKey === 'BAR_CORNER')) {
+                    const plane = m.mesh.getObjectByName('LogoPlane');
+                    if (plane) {
+                        plane.position.set(cal.offsetX || 0, cal.offsetY !== undefined ? cal.offsetY : 0.55, cal.offsetZ !== undefined ? cal.offsetZ : 0.225);
+                        plane.rotation.y = (cal.rotY || 0) * (Math.PI / 180);
+                        if (plane.geometry) {
+                            plane.geometry.dispose();
+                            plane.geometry = new THREE.PlaneGeometry(cal.width || 1.10, cal.height || 0.45);
+                        }
+                    }
+                }
+            });
+            return;
+        }
 
         // Specjalna obsługa offsetu dla modułów dodanych do wyjścia rogu
         if (key === 'barCornerRightOut' || key === 'barCornerLeftOut') {
@@ -319,6 +372,9 @@ export class CalibrationTool {
             case 'barCornerLeftOut':    return 'Bar dodawany do Rogu Lewego';
             case 'regal':               return 'Regał Zaplecza (1.5m)';
             case 'fridge':              return 'Lodówka Eventowa (1.0m)';
+            case 'logoBarStraight':     return 'Logo: Bar Prosty';
+            case 'logoCornerRight':     return 'Logo: Narożnik Prawy';
+            case 'logoCornerLeft':      return 'Logo: Narożnik Lewy';
             default: return key;
         }
     }

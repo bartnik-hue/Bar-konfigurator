@@ -4,8 +4,9 @@ import * as THREE from 'three';
  * Zarządca personalizacji grafiki i brandingu frontów barowych.
  */
 export class BrandingManager {
-    constructor(barBuilder) {
+    constructor(barBuilder, registry = null) {
         this.barBuilder = barBuilder;
+        this.registry = registry;
         this.currentTexture = null;
         this.currentDataUrl = null;
         this.textureLoader = new THREE.TextureLoader();
@@ -32,8 +33,11 @@ export class BrandingManager {
             texture.colorSpace = THREE.SRGBColorSpace;
             texture.wrapS = THREE.ClampToEdgeWrapping;
             texture.wrapT = THREE.ClampToEdgeWrapping;
-            texture.flipY = false; // Zgodnie z glTF convention
+            texture.flipY = true;
             this.currentTexture = texture;
+            if (this.registry) {
+                this.registry.activeLogoTexture = texture;
+            }
 
             this.applyToAllFronts();
             if (onLoaded) onLoaded(dataUrl);
@@ -41,24 +45,33 @@ export class BrandingManager {
     }
 
     applyToAllFronts() {
-        if (!this.currentTexture) return;
+        const tex = this.currentTexture || (this.registry?.placeholderLogoTexture);
+        if (!tex) return;
 
         this.barBuilder.modules.forEach(moduleData => {
-            this.applyToModule(moduleData, this.currentTexture);
+            this.applyToModule(moduleData, tex);
         });
     }
 
     applyToModule(moduleData, texture) {
+        const tex = texture || this.currentTexture || (this.registry?.placeholderLogoTexture);
+        if (!tex) return;
+
         moduleData.mesh.traverse(child => {
+            // 1. Dedykowana płaszczyzna nakładki logo (Plane overlay)
+            if (child.isMesh && child.userData.isLogoPlane) {
+                child.material.map = tex;
+                child.material.needsUpdate = true;
+                child.visible = true;
+            }
+
+            // 2. Siatki frontowe oznaczone w materiale modelu GLB
             if (child.isMesh && child.userData.isBrandingFront) {
-                // Jeśli materiał nie został jeszcze sklonowany, klonujemy go
                 if (!child.userData.originalMaterial) {
                     child.userData.originalMaterial = child.material;
                 }
-
-                // Stwórz nowy materiał z teksturą brandingu
                 const customMat = child.userData.originalMaterial.clone();
-                customMat.map = texture;
+                customMat.map = tex;
                 customMat.needsUpdate = true;
                 child.material = customMat;
             }
@@ -68,9 +81,18 @@ export class BrandingManager {
     resetBranding() {
         this.currentTexture = null;
         this.currentDataUrl = null;
+        if (this.registry) {
+            this.registry.activeLogoTexture = null;
+        }
+
+        const defaultTex = this.registry?.placeholderLogoTexture || null;
 
         this.barBuilder.modules.forEach(moduleData => {
             moduleData.mesh.traverse(child => {
+                if (child.isMesh && child.userData.isLogoPlane) {
+                    child.material.map = defaultTex;
+                    child.material.needsUpdate = true;
+                }
                 if (child.isMesh && child.userData.isBrandingFront && child.userData.originalMaterial) {
                     child.material = child.userData.originalMaterial;
                 }

@@ -17,7 +17,7 @@ class ArtbarApp {
 
         this.registry = new ModelRegistry();
         this.barBuilder = new BarBuilder(this.scene, this.camera, this.renderer, this.registry, (stats) => this.updateUIStats(stats));
-        this.brandingManager = new BrandingManager(this.barBuilder);
+        this.brandingManager = new BrandingManager(this.barBuilder, this.registry);
 
         // Automatyczne nakładanie bieżącego brandingu na nowo dodawane moduły
         this.barBuilder.onModuleAdded = (moduleData) => {

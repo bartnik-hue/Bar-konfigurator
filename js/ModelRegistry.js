@@ -61,14 +61,53 @@ export class ModelRegistry {
                 offsetY: 0.000,
                 offsetZ: 0.000,
                 rotY: 0
+            },
+            logoBarStraight: {
+                width: 1.200,
+                height: 0.450,
+                offsetX: 0.000,
+                offsetY: 0.550,
+                offsetZ: 0.225,
+                rotY: 0
+            },
+            logoCornerRight: {
+                width: 0.700,
+                height: 0.450,
+                offsetX: 0.150,
+                offsetY: 0.550,
+                offsetZ: 0.150,
+                rotY: 45
+            },
+            logoCornerLeft: {
+                width: 0.700,
+                height: 0.450,
+                offsetX: -0.150,
+                offsetY: 0.550,
+                offsetZ: 0.150,
+                rotY: -45
             }
         };
+
+        this.placeholderLogoTexture = null;
+        this.activeLogoTexture = null;
+        this.loadPlaceholderTexture();
 
         this.calibration = this.loadCalibration();
     }
 
+    loadPlaceholderTexture() {
+        const texLoader = new THREE.TextureLoader();
+        texLoader.load('/wzor/dlugi alpha0001.png', (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            this.placeholderLogoTexture = tex;
+            if (!this.activeLogoTexture) {
+                this.updateAllLogoPlanes(tex);
+            }
+        });
+    }
+
     loadCalibration() {
-        const saved = localStorage.getItem('artbar_calibration_v8');
+        const saved = localStorage.getItem('artbar_calibration_v9') || localStorage.getItem('artbar_calibration_v8');
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
@@ -81,7 +120,7 @@ export class ModelRegistry {
     }
 
     saveCalibration() {
-        localStorage.setItem('artbar_calibration_v8', JSON.stringify(this.calibration));
+        localStorage.setItem('artbar_calibration_v9', JSON.stringify(this.calibration));
     }
 
     resetCalibration() {
@@ -327,7 +366,65 @@ export class ModelRegistry {
         this.applyCalibrationToInstance(pivotNode, effectiveKey);
 
         wrapper.add(pivotNode);
+
+        // Jeśli moduł to bar (prosty lub narożnik), dodaj dedykowany plane na logo
+        if (effectiveKey === 'BAR_STRAIGHT' || effectiveKey === 'BAR_CORNER_RIGHT' || effectiveKey === 'BAR_CORNER_LEFT') {
+            const logoPlane = this.createLogoPlane(effectiveKey);
+            if (logoPlane) {
+                wrapper.add(logoPlane);
+            }
+        }
+
         return wrapper;
+    }
+
+    getLogoCalibrationKey(modelKey) {
+        if (modelKey === 'BAR_STRAIGHT') return 'logoBarStraight';
+        if (modelKey === 'BAR_CORNER_RIGHT' || modelKey === 'BAR_CORNER') return 'logoCornerRight';
+        if (modelKey === 'BAR_CORNER_LEFT') return 'logoCornerLeft';
+        return null;
+    }
+
+    createLogoPlane(modelKey) {
+        const calKey = this.getLogoCalibrationKey(modelKey);
+        if (!calKey) return null;
+
+        const cal = this.calibration[calKey] || {};
+        const width = cal.width || (modelKey === 'BAR_STRAIGHT' ? 1.20 : 0.70);
+        const height = cal.height || 0.45;
+
+        const geom = new THREE.PlaneGeometry(width, height);
+        const mat = new THREE.MeshBasicMaterial({
+            map: this.activeLogoTexture || this.placeholderLogoTexture || null,
+            transparent: true,
+            opacity: 0.99,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+            side: THREE.DoubleSide
+        });
+
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.name = 'LogoPlane';
+        mesh.userData.isLogoPlane = true;
+        mesh.userData.logoKey = calKey;
+        mesh.position.set(cal.offsetX || 0, cal.offsetY !== undefined ? cal.offsetY : 0.55, cal.offsetZ !== undefined ? cal.offsetZ : 0.225);
+        mesh.rotation.y = (cal.rotY || 0) * (Math.PI / 180);
+
+        return mesh;
+    }
+
+    updateAllLogoPlanes(texture) {
+        if (window.app?.barBuilder?.modules) {
+            window.app.barBuilder.modules.forEach(m => {
+                const plane = m.mesh.getObjectByName('LogoPlane');
+                if (plane && plane.material) {
+                    plane.material.map = texture;
+                    plane.material.needsUpdate = true;
+                }
+            });
+        }
     }
 
     applyCalibrationToInstance(pivotNode, modelKey) {
@@ -346,8 +443,13 @@ export class ModelRegistry {
             case 'BAR_CORNER_LEFT':     return this.calibration.barCornerLeft;
             case 'barCornerRightOut':   return this.calibration.barCornerRightOut;
             case 'barCornerLeftOut':    return this.calibration.barCornerLeftOut;
-            case 'BACK_SHELF':          return this.calibration.regal;
-            case 'BACK_FRIDGE':         return this.calibration.fridge;
+            case 'BACK_SHELF':          
+            case 'regal':               return this.calibration.regal;
+            case 'BACK_FRIDGE':         
+            case 'fridge':              return this.calibration.fridge;
+            case 'logoBarStraight':     return this.calibration.logoBarStraight;
+            case 'logoCornerRight':     return this.calibration.logoCornerRight;
+            case 'logoCornerLeft':      return this.calibration.logoCornerLeft;
             default: return null;
         }
     }
