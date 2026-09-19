@@ -52,6 +52,8 @@ export class BrandingManager {
         this.barBuilder.modules.forEach(moduleData => {
             this.applyToModule(moduleData, tex);
         });
+    }
+
     setEnabled(enabled) {
         this.isEnabled = !!enabled;
         if (this.registry) {
