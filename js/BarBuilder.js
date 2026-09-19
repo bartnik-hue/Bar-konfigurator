@@ -218,7 +218,10 @@ export class BarBuilder {
         const mod = moduleData || this.selectedModule;
         if (!mod) return null;
 
-        this.pickedUpOriginal = {
+        // Jeśli jakikolwiek inny ghost był aktywny, wyczyść go przed podniesieniem
+        this.cancelGhost();
+
+        const orig = {
             id: mod.id,
             modelKey: mod.modelKey,
             position: mod.mesh.position.clone(),
@@ -226,19 +229,30 @@ export class BarBuilder {
             attachedTo: mod.attachedTo
         };
 
-        // Jeśli to narożnik, używamy typu uniwersalnego 'BAR_CORNER', aby dopasowywał się do nowego gniazda
-        const ghostKey = (mod.modelKey === 'BAR_CORNER_RIGHT' || mod.modelKey === 'BAR_CORNER_LEFT')
-            ? 'BAR_CORNER'
-            : mod.modelKey;
-
+        // Usuń moduł ze sceny
         this.removeModule(mod);
-        this.startGhost(ghostKey);
-        this.ghostRotation = this.pickedUpOriginal.rotationY;
+
+        // Zapamiętaj dane do ewentualnego przywrócenia przy anulowaniu (ESC/PPM)
+        this.pickedUpOriginal = orig;
+
+        // Jeśli to narożnik, używamy typu uniwersalnego 'BAR_CORNER', aby dopasowywał się do nowego złącza
+        const ghostKey = (orig.modelKey === 'BAR_CORNER_RIGHT' || orig.modelKey === 'BAR_CORNER_LEFT')
+            ? 'BAR_CORNER'
+            : orig.modelKey;
+
+        this.ghostModelKey = ghostKey;
+        this.ghostRotation = orig.rotationY;
+        this.ghostSnapContext = null;
+
+        const initialKey = (ghostKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : ghostKey;
+        this.createGhostMesh(initialKey);
         if (this.ghostModule) {
-            this.ghostModule.rotation.y = this.ghostRotation;
+            this.ghostModule.position.copy(orig.position);
+            this.ghostModule.rotation.y = orig.rotationY;
+            this.setGhostVisualSnap(false);
         }
 
-        return this.pickedUpOriginal;
+        return orig;
     }
 
     selectModule(moduleData) {
