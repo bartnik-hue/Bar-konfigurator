@@ -37,6 +37,8 @@ export class BarBuilder {
 
         // Zapamiętanie stanu podniesionego obiektu do przeniesienia (move/pickup)
         this.pickedUpOriginal = null;
+        this.ghostGroupItems = null;
+        this.pickedUpGroupOriginal = null;
     }
 
     createSelectionRing() {
@@ -261,6 +263,165 @@ export class BarBuilder {
         }
 
         return orig;
+    }
+
+    /**
+     * Zwraca pozycje wszystkich gniazd modułu w przestrzeni świata 3D
+     */
+    getModuleWorldSockets(m) {
+        const defs = this.registry.getSocketDefinitions(m.modelKey);
+        return defs.map(d => {
+            const pos = d.position.clone();
+            pos.applyAxisAngle(new THREE.Vector3(0, 1, 0), m.mesh.rotation.y);
+            pos.add(m.mesh.position);
+            return { id: d.id, pos: pos, def: d };
+        });
+    }
+
+    /**
+     * Zwraca bezpośrednio połączone moduły sąsiednie (wg logicznego attachedTo oraz fizycznego styku gniazd)
+     */
+    getDirectNeighbors(mod) {
+        const neighbors = [];
+        const threshold = 0.28; // promień tolerancji styków złączy (28 cm)
+        const modSockets = this.getModuleWorldSockets(mod);
+
+        for (const other of this.modules) {
+            if (other === mod) continue;
+
+            // Sprawdź relację logiczną
+            if (other.attachedTo?.parentModuleId === mod.id || mod.attachedTo?.parentModuleId === other.id) {
+                neighbors.push(other);
+                continue;
+            }
+
+            // Sprawdź fizyczny styk gniazd w świecie 3D
+            const otherSockets = this.getModuleWorldSockets(other);
+            let isConnected = false;
+
+            for (const s1 of modSockets) {
+                for (const s2 of otherSockets) {
+                    if (s1.pos.distanceTo(s2.pos) < threshold) {
+                        isConnected = true;
+                        break;
+                    }
+                }
+                if (isConnected) break;
+            }
+
+            if (isConnected) {
+                neighbors.push(other);
+            }
+        }
+
+        return neighbors;
+    }
+
+    /**
+     * Przeszukuje graf połączeń (BFS) i zwraca wszystkie moduły w połączonym układzie
+     */
+    getConnectedModules(startModule) {
+        if (!startModule) return [];
+
+        const visited = new Set();
+        const queue = [startModule];
+        visited.add(startModule);
+
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = this.getDirectNeighbors(current);
+
+            for (const neighbor of neighbors) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    queue.push(neighbor);
+                }
+            }
+        }
+
+        return Array.from(visited);
+    }
+
+    /**
+     * Podnosi cały połączony układ (wybrany moduł oraz wszystkie fizycznie/logicznie połączone z nim moduły)
+     */
+    pickupGroup(moduleData = null) {
+        const anchor = moduleData || this.selectedModule;
+        if (!anchor) return null;
+
+        this.cancelGhost();
+
+        const connectedModules = this.getConnectedModules(anchor);
+        if (connectedModules.length <= 1) {
+            return this.pickupModule(anchor);
+        }
+
+        const origList = connectedModules.map(m => ({
+            id: m.id,
+            modelKey: m.modelKey,
+            position: m.mesh.position.clone(),
+            rotationY: m.rotationY,
+            attachedTo: m.attachedTo
+        }));
+
+        this.pickedUpGroupOriginal = {
+            anchorId: anchor.id,
+            modules: origList
+        };
+
+        const anchorPos = anchor.mesh.position.clone();
+        const anchorRot = (anchor.rotationY % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+        // Oblicz relatywne pozycje każdego modułu względem modułu bazowego
+        const groupItems = connectedModules.map(m => {
+            const worldPos = m.mesh.position.clone();
+            const relPos = worldPos.sub(anchorPos).applyAxisAngle(new THREE.Vector3(0, 1, 0), -anchorRot);
+            const relRot = (m.rotationY - anchorRot) % (2 * Math.PI);
+            return {
+                modelKey: m.modelKey,
+                relPos: relPos,
+                relRot: relRot,
+                isAnchor: (m === anchor)
+            };
+        });
+
+        // Usuń moduły grupy ze sceny
+        connectedModules.forEach(m => this.removeModule(m));
+
+        // Utwórz grupę ghost
+        this.ghostGroupItems = groupItems;
+        this.ghostModelKey = 'GROUP';
+        this.ghostRotation = anchorRot;
+        this.ghostSnapContext = null;
+        this.lastGhostIntersect = anchorPos.clone();
+
+        const groupMesh = new THREE.Group();
+        groupItems.forEach(item => {
+            const mesh = this.registry.instantiate(item.modelKey);
+            if (!mesh) return;
+
+            mesh.position.copy(item.relPos);
+            mesh.rotation.y = item.relRot;
+
+            mesh.traverse(child => {
+                if (child.isMesh) {
+                    child.material = child.material.clone();
+                    child.material.transparent = true;
+                    child.material.opacity = 0.55;
+                    child.material.depthWrite = false;
+                }
+            });
+
+            groupMesh.add(mesh);
+        });
+
+        groupMesh.position.copy(anchorPos);
+        groupMesh.rotation.y = anchorRot;
+
+        this.ghostModule = groupMesh;
+        this.scene.add(this.ghostModule);
+
+        return this.pickedUpGroupOriginal;
     }
 
     selectModule(moduleData) {
@@ -647,6 +808,18 @@ export class BarBuilder {
         if (!this.ghostModule || !intersectPoint) return;
         this.lastGhostIntersect = intersectPoint.clone();
 
+        if (this.ghostGroupItems) {
+            // Ruch całej grupy połączonych modułów: precyzyjne pozycjonowanie na siatce 0.25m
+            const snap = 0.25;
+            const snappedX = Math.round(intersectPoint.x / snap) * snap;
+            const snappedZ = Math.round(intersectPoint.z / snap) * snap;
+
+            this.ghostModule.position.set(snappedX, 0, snappedZ);
+            this.ghostModule.rotation.y = this.ghostRotation;
+            this.setGhostVisualSnap(false);
+            return;
+        }
+
         // Sprawdź czy w pobliżu kursora znajduje się pasujące gniazdo do przyciągnięcia
         const snapCandidate = this.findBestSocketSnap(intersectPoint, this.ghostModelKey, this.ghostRotation);
 
@@ -707,6 +880,33 @@ export class BarBuilder {
         // Oznacz przenoszenie jako pomyślnie zakończone (nie przywracaj starego)
         this.pickedUpOriginal = null;
 
+        // Obsługa zatwierdzenia przemieszczania całej grupy modułów
+        if (this.ghostGroupItems) {
+            let anchorMod = null;
+            const groupAngle = this.ghostModule.rotation.y;
+            const groupPos = this.ghostModule.position.clone();
+            const groupItems = this.ghostGroupItems;
+
+            this.pickedUpGroupOriginal = null;
+            this.cancelGhost();
+
+            groupItems.forEach(item => {
+                const worldPos = item.relPos.clone()
+                    .applyAxisAngle(new THREE.Vector3(0, 1, 0), groupAngle)
+                    .add(groupPos);
+                const worldRot = (groupAngle + item.relRot) % (2 * Math.PI);
+                const newMod = this.addModule(item.modelKey, worldPos, worldRot);
+                if (item.isAnchor && newMod) {
+                    anchorMod = newMod;
+                }
+            });
+
+            if (anchorMod) {
+                this.selectModule(anchorMod);
+            }
+            return anchorMod;
+        }
+
         let mod = null;
         if (this.ghostSnapContext) {
             // Dołącz do przyciągniętego gniazda z pełnymi metadanymi i offsetem
@@ -740,9 +940,30 @@ export class BarBuilder {
             this.currentGhostMeshKey = null;
             this.ghostSnapContext = null;
             this.lastGhostIntersect = null;
+            this.ghostGroupItems = null;
         }
 
-        // Jeśli obiekt był podniesiony (move) i użytkownik anulował akcję (ESC/PPM), przywróć go
+        // Jeśli cała grupa była podniesiona (move group) i anulowano (ESC/PPM), przywróć wszystkie moduły
+        if (this.pickedUpGroupOriginal) {
+            const groupOrig = this.pickedUpGroupOriginal;
+            this.pickedUpGroupOriginal = null;
+            let anchorMod = null;
+            groupOrig.modules.forEach(orig => {
+                const restored = this.addModule(orig.modelKey, orig.position, orig.rotationY);
+                if (restored) {
+                    restored.attachedTo = orig.attachedTo;
+                    if (orig.id === groupOrig.anchorId) {
+                        anchorMod = restored;
+                    }
+                }
+            });
+            if (anchorMod) {
+                this.selectModule(anchorMod);
+            }
+            return;
+        }
+
+        // Jeśli pojedynczy obiekt był podniesiony (move) i użytkownik anulował akcję (ESC/PPM), przywróć go
         if (this.pickedUpOriginal) {
             const orig = this.pickedUpOriginal;
             this.pickedUpOriginal = null;

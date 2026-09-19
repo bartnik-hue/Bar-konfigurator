@@ -608,6 +608,16 @@ class ArtbarApp {
             }
         });
 
+        document.getElementById('radial-btn-move-all')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const picked = this.barBuilder.pickupGroup();
+            if (picked) {
+                this.hideRadialMenu();
+                const count = picked.modules ? picked.modules.length : 1;
+                this.showToast(`Przesuwanie całego modułu (${count} el.). R - obrót, LPM - postaw, ESC/PPM - powrót.`);
+            }
+        });
+
         document.getElementById('radial-btn-delete')?.addEventListener('click', (e) => {
             e.stopPropagation();
             this.barBuilder.removeSelected();

@@ -858,23 +858,29 @@ body, html {
     text-transform: uppercase;
 }
 
-/* Rozmieszczenie na łuku (Promień R = 85px) */
-/* 1. Obróć: lewa góra (-140°) -> x: -65px, y: -62px */
+/* Rozmieszczenie na łuku (Promień R = 105px, kąty: -155°, -112°, -68°, -25°) */
+/* 1. Obróć: lewa strona */
 .radial-btn-rotate {
-    left: -68px;
-    top: -64px;
+    left: -95px;
+    top: -44px;
 }
 
-/* 2. Przesuń: szczyt (-90°) -> x: 0px, y: -94px */
+/* 2. Przesuń pojedynczy: lewa góra */
 .radial-btn-move {
-    left: 0px;
-    top: -95px;
+    left: -39px;
+    top: -97px;
 }
 
-/* 3. Usuń: prawa góra (-40°) -> x: +68px, y: -64px */
+/* 3. Przesuń cały moduł: prawa góra */
+.radial-btn-move-all {
+    left: 39px;
+    top: -97px;
+}
+
+/* 4. Usuń: prawa strona */
 .radial-btn-delete {
-    left: 68px;
-    top: -64px;
+    left: 95px;
+    top: -44px;
 }
 
 /* Stany hover */
