@@ -20,6 +20,7 @@ export class BarBuilder {
         this.ghostModelKey = null;
         this.ghostRotation = 0;
         this.ghostSnapContext = null;
+        this.lastGhostIntersect = null;
 
         // Materiał kropki połączeniowej (złota świecąca kropka w stylu Artbar)
         this.socketGeom = new THREE.SphereGeometry(0.14, 16, 16);
@@ -247,14 +248,15 @@ export class BarBuilder {
             : orig.modelKey;
 
         this.ghostModelKey = ghostKey;
-        this.ghostRotation = orig.rotationY;
+        this.ghostRotation = (orig.rotationY % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
         this.ghostSnapContext = null;
+        this.lastGhostIntersect = orig.position.clone();
 
         const initialKey = (ghostKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : ghostKey;
         this.createGhostMesh(initialKey);
         if (this.ghostModule) {
             this.ghostModule.position.copy(orig.position);
-            this.ghostModule.rotation.y = orig.rotationY;
+            this.ghostModule.rotation.y = this.ghostRotation;
             this.setGhostVisualSnap(false);
         }
 
@@ -494,15 +496,45 @@ export class BarBuilder {
     }
 
     /**
+     * Sprawdza czy dwa kąty w radianach reprezentują ten sam obrót (modulo 2*PI)
+     */
+    isSameRotation(rotA, rotB, tolerance = 0.08) {
+        const norm = (angle) => {
+            let a = angle % (2 * Math.PI);
+            if (a < 0) a += 2 * Math.PI;
+            return a;
+        };
+        const a1 = norm(rotA);
+        const a2 = norm(rotB);
+        const diff = Math.abs(a1 - a2);
+        return Math.min(diff, 2 * Math.PI - diff) < tolerance;
+    }
+
+    /**
      * Wyszukuje najbliższe kompatybilne i wolne gniazdo do przyciągnięcia (Magnetic Snap)
      */
-    findBestSocketSnap(cursorPoint, modelKey) {
+    findBestSocketSnap(cursorPoint, modelKey, currentRotation = this.ghostRotation) {
         if (!cursorPoint || !modelKey) return null;
 
         let bestSnap = null;
         let minDistance = 1.10; // Promień przyciągania: 1.1m
 
+        const isFridge = (k) => k === 'BACK_FRIDGE' || k === 'BACK_FRIDGE_SLIM';
+        const isShelf = (k) => k === 'BACK_SHELF';
+
         for (const m of this.modules) {
+            // Wymóg: lodówki przyciągają się do regałów (oraz między sobą) tylko wtedy, gdy są tak samo obrócone
+            if (
+                (isFridge(modelKey) && isShelf(m.modelKey)) ||
+                (isShelf(modelKey) && isFridge(m.modelKey)) ||
+                (isFridge(modelKey) && isFridge(m.modelKey)) ||
+                (isShelf(modelKey) && isShelf(m.modelKey))
+            ) {
+                if (currentRotation !== undefined && !this.isSameRotation(currentRotation, m.mesh.rotation.y)) {
+                    continue;
+                }
+            }
+
             const defs = this.registry.getSocketDefinitions(m.modelKey);
             for (const socketDef of defs) {
                 // Czy dany model może być podłączony do tego gniazda?
@@ -565,6 +597,7 @@ export class BarBuilder {
         this.ghostModelKey = modelKey;
         this.ghostRotation = 0;
         this.ghostSnapContext = null;
+        this.lastGhostIntersect = null;
 
         const initialKey = (modelKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : modelKey;
         this.createGhostMesh(initialKey);
@@ -612,9 +645,10 @@ export class BarBuilder {
 
     updateGhost(intersectPoint) {
         if (!this.ghostModule || !intersectPoint) return;
+        this.lastGhostIntersect = intersectPoint.clone();
 
         // Sprawdź czy w pobliżu kursora znajduje się pasujące gniazdo do przyciągnięcia
-        const snapCandidate = this.findBestSocketSnap(intersectPoint, this.ghostModelKey);
+        const snapCandidate = this.findBestSocketSnap(intersectPoint, this.ghostModelKey, this.ghostRotation);
 
         if (snapCandidate) {
             this.ghostSnapContext = snapCandidate;
@@ -656,8 +690,13 @@ export class BarBuilder {
     }
 
     rotateGhost(delta = Math.PI / 2) {
-        this.ghostRotation += delta;
-        if (!this.ghostSnapContext && this.ghostModule) {
+        this.ghostRotation = (this.ghostRotation + delta) % (2 * Math.PI);
+        if (this.ghostRotation < 0) this.ghostRotation += 2 * Math.PI;
+
+        const testPoint = this.lastGhostIntersect || (this.ghostModule ? this.ghostModule.position : null);
+        if (testPoint) {
+            this.updateGhost(testPoint);
+        } else if (this.ghostModule) {
             this.ghostModule.rotation.y = this.ghostRotation;
         }
     }
@@ -700,6 +739,7 @@ export class BarBuilder {
             this.ghostModelKey = null;
             this.currentGhostMeshKey = null;
             this.ghostSnapContext = null;
+            this.lastGhostIntersect = null;
         }
 
         // Jeśli obiekt był podniesiony (move) i użytkownik anulował akcję (ESC/PPM), przywróć go
