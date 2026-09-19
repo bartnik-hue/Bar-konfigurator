@@ -45,10 +45,25 @@ class ArtbarApp {
         this.scene.background = new THREE.Color(0x121212);
         this.scene.fog = new THREE.FogExp2(0x121212, 0.035);
 
-        // Kamera
+        // Kamery: Perspektywiczna i Ortograficzna (Aksonometryczna / Ortho pod kątem)
         const aspect = window.innerWidth / window.innerHeight;
-        this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 200);
-        this.camera.position.set(0, 6.5, 9.5);
+        this.perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 200);
+        this.perspCamera.position.set(0, 6.5, 9.5);
+
+        this.orthoFrustumSize = 8.5;
+        this.orthoCamera = new THREE.OrthographicCamera(
+            -this.orthoFrustumSize * aspect / 2,
+            this.orthoFrustumSize * aspect / 2,
+            this.orthoFrustumSize / 2,
+            -this.orthoFrustumSize / 2,
+            0.1,
+            200
+        );
+        this.orthoCamera.position.set(10, 8.5, 10);
+        this.orthoCamera.lookAt(0, 0.5, 0);
+
+        this.camera = this.perspCamera;
+        this.cameraMode = 'perspective';
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({
@@ -70,6 +85,8 @@ class ArtbarApp {
         this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Nie pozwól zajrzeć pod podłogę
         this.controls.minDistance = 2.0;
         this.controls.maxDistance = 40.0;
+        this.controls.minZoom = 0.25;
+        this.controls.maxZoom = 4.0;
         this.controls.target.set(0, 0.6, 0);
 
         // Płaszczyzna raycastingu dla podłogi
@@ -79,6 +96,35 @@ class ArtbarApp {
 
         // Resize handler
         window.addEventListener('resize', () => this.onResize());
+    }
+
+    setCameraMode(mode) {
+        if (mode === 'orthographic') {
+            this.cameraMode = 'orthographic';
+            this.updateOrthoFrustum();
+            this.orthoCamera.zoom = 1.0;
+            this.camera = this.orthoCamera;
+        } else {
+            this.cameraMode = 'perspective';
+            this.camera = this.perspCamera;
+        }
+
+        this.controls.object = this.camera;
+        this.controls.update();
+
+        if (this.barBuilder) {
+            this.barBuilder.camera = this.camera;
+        }
+    }
+
+    updateOrthoFrustum() {
+        if (!this.orthoCamera) return;
+        const aspect = window.innerWidth / window.innerHeight;
+        this.orthoCamera.left = -this.orthoFrustumSize * aspect / 2;
+        this.orthoCamera.right = this.orthoFrustumSize * aspect / 2;
+        this.orthoCamera.top = this.orthoFrustumSize / 2;
+        this.orthoCamera.bottom = -this.orthoFrustumSize / 2;
+        this.orthoCamera.updateProjectionMatrix();
     }
 
     initLights() {
@@ -522,25 +568,26 @@ class ArtbarApp {
         });
 
         // Przyciski widoków
-        document.getElementById('btn-view-orbit').addEventListener('click', (e) => {
-            this.setActiveViewBtn(e.target);
+        document.getElementById('btn-view-orbit')?.addEventListener('click', (e) => {
+            this.setActiveViewBtn(e.currentTarget);
+            this.setCameraMode('perspective');
             this.animateCamera(new THREE.Vector3(0, 6.5, 9.5), new THREE.Vector3(0, 0.6, 0));
         });
 
-        document.getElementById('btn-view-top').addEventListener('click', (e) => {
-            this.setActiveViewBtn(e.target);
+        document.getElementById('btn-view-top')?.addEventListener('click', (e) => {
+            this.setActiveViewBtn(e.currentTarget);
+            this.setCameraMode('perspective');
             this.animateCamera(new THREE.Vector3(0, 15, 0.001), new THREE.Vector3(0, 0, 0));
         });
 
-        document.getElementById('btn-view-reset').addEventListener('click', () => {
-            this.animateCamera(new THREE.Vector3(0, 6.5, 9.5), new THREE.Vector3(0, 0.6, 0));
+        document.getElementById('btn-view-ortho')?.addEventListener('click', (e) => {
+            this.setActiveViewBtn(e.currentTarget);
+            this.setCameraMode('orthographic');
+            // Kąt aksonometryczny pod kątem 45°
+            this.animateCamera(new THREE.Vector3(10, 8.5, 10), new THREE.Vector3(0, 0.5, 0));
         });
 
-        document.getElementById('btn-rotate-module').addEventListener('click', () => {
-            this.barBuilder.rotateSelected();
-        });
-
-        document.getElementById('btn-delete-module').addEventListener('click', () => {
+        document.getElementById('btn-delete-module')?.addEventListener('click', () => {
             this.barBuilder.removeSelected();
             this.hideRadialMenu();
         });
@@ -816,7 +863,7 @@ class ArtbarApp {
     }
 
     setActiveViewBtn(btn) {
-        document.querySelectorAll('#btn-view-orbit, #btn-view-top').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#btn-view-orbit, #btn-view-top, #btn-view-ortho').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
     }
 
@@ -876,8 +923,10 @@ class ArtbarApp {
     }
 
     onResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
+        const aspect = window.innerWidth / window.innerHeight;
+        this.perspCamera.aspect = aspect;
+        this.perspCamera.updateProjectionMatrix();
+        this.updateOrthoFrustum();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
