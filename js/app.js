@@ -171,6 +171,7 @@ class ArtbarApp {
                 this.barBuilder.cancelGhost();
                 this.barBuilder.deselectModule();
                 this.hideContextMenu();
+                this.hideRadialMenu();
             }
         });
 
@@ -208,7 +209,7 @@ class ArtbarApp {
         // Jeśli kliknięto w elementy UI, ignoruj
         if (e.target.closest('.top-header') || e.target.closest('.top-actions') || 
             e.target.closest('.bottom-controls') || e.target.closest('.side-panel') || 
-            e.target.closest('#context-menu')) {
+            e.target.closest('#context-menu') || e.target.closest('#radial-action-menu')) {
             return;
         }
 
@@ -268,6 +269,7 @@ class ArtbarApp {
         // 4. Kliknięcie w puste tło odznacza moduł
         this.barBuilder.deselectModule();
         this.hideContextMenu();
+        this.hideRadialMenu();
     }
 
     onContextMenu(e) {
@@ -276,7 +278,7 @@ class ArtbarApp {
         // Jeśli jesteśmy w trybie ghosta, PPM anuluje ghosta
         if (this.barBuilder.ghostModule) {
             this.barBuilder.cancelGhost();
-            this.showToast('Anulowano stawianie modułu.');
+            this.showToast('Anulowano stawianie / przemieszczanie modułu.');
             return;
         }
 
@@ -489,6 +491,34 @@ class ArtbarApp {
 
         document.getElementById('btn-delete-module').addEventListener('click', () => {
             this.barBuilder.removeSelected();
+            this.hideRadialMenu();
+        });
+
+        // Obsługa przycisków menu półradialnego nad obiektem 3D
+        const radialMenuElem = document.getElementById('radial-action-menu');
+        radialMenuElem?.addEventListener('pointerdown', (e) => e.stopPropagation());
+        radialMenuElem?.addEventListener('click', (e) => e.stopPropagation());
+
+        document.getElementById('radial-btn-rotate')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.barBuilder.rotateSelected();
+            this.showToast('Obrócono moduł o 90°');
+        });
+
+        document.getElementById('radial-btn-move')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const picked = this.barBuilder.pickupModule();
+            if (picked) {
+                this.hideRadialMenu();
+                this.showToast('Tryb przesuwania modułu. Zbliż do złącza, aby dociągnąć, lub postaw na siatce. ESC/PPM - powrót.');
+            }
+        });
+
+        document.getElementById('radial-btn-delete')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.barBuilder.removeSelected();
+            this.hideRadialMenu();
+            this.showToast('Usunięto moduł.');
         });
 
         document.getElementById('btn-clear-scene').addEventListener('click', () => {
@@ -717,11 +747,52 @@ class ArtbarApp {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    updateRadialMenuPosition() {
+        const menu = document.getElementById('radial-action-menu');
+        if (!menu) return;
+
+        if (!this.barBuilder.selectedModule) {
+            if (menu.classList.contains('visible')) {
+                menu.classList.remove('visible');
+            }
+            return;
+        }
+
+        const anchor = this.barBuilder.getSelectedModuleAnchor();
+        if (!anchor) {
+            menu.classList.remove('visible');
+            return;
+        }
+
+        const projected = anchor.clone().project(this.camera);
+
+        // Jeśli punkt znajduje się za płaszczyzną kamery (niewidoczny), ukryj
+        if (projected.z > 1.0) {
+            menu.classList.remove('visible');
+            return;
+        }
+
+        const screenX = (projected.x * 0.5 + 0.5) * window.innerWidth;
+        const screenY = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+
+        menu.style.left = `${screenX}px`;
+        menu.style.top = `${screenY}px`;
+        if (!menu.classList.contains('visible')) {
+            menu.classList.add('visible');
+        }
+    }
+
+    hideRadialMenu() {
+        const menu = document.getElementById('radial-action-menu');
+        if (menu) menu.classList.remove('visible');
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
 
         this.controls.update();
         this.barBuilder.update(0.016);
+        this.updateRadialMenuPosition();
         this.renderer.render(this.scene, this.camera);
     }
 }

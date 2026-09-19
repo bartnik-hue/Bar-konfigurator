@@ -33,6 +33,9 @@ export class BarBuilder {
         this.selectionRing = this.createSelectionRing();
         this.scene.add(this.selectionRing);
         this.selectionRing.visible = false;
+
+        // Zapamiętanie stanu podniesionego obiektu do przeniesienia (move/pickup)
+        this.pickedUpOriginal = null;
     }
 
     createSelectionRing() {
@@ -189,8 +192,53 @@ export class BarBuilder {
         if (!this.selectedModule) return;
         this.selectedModule.rotationY += deltaAngle;
         this.selectedModule.mesh.rotation.y = this.selectedModule.rotationY;
-        this.updateSocketHandles();
+        this.generateSocketHandles(this.selectedModule);
         this.notifyChange();
+    }
+
+    /**
+     * Zwraca punkt kotwiczenia menu (środek górnej krawędzi modułu) w przestrzeni świata 3D
+     */
+    getSelectedModuleAnchor() {
+        if (!this.selectedModule || !this.selectedModule.mesh) return null;
+        const pos = this.selectedModule.mesh.position;
+        let height = 1.15;
+        if (this.selectedModule.modelKey === 'BACK_SHELF') {
+            height = 1.85;
+        } else if (this.selectedModule.modelKey === 'BACK_FRIDGE') {
+            height = 1.95;
+        }
+        return new THREE.Vector3(pos.x, height, pos.z);
+    }
+
+    /**
+     * Podnosi zaznaczony moduł ze sceny do trybu przemieszczania (Ghost / Move mode)
+     */
+    pickupModule(moduleData = null) {
+        const mod = moduleData || this.selectedModule;
+        if (!mod) return null;
+
+        this.pickedUpOriginal = {
+            id: mod.id,
+            modelKey: mod.modelKey,
+            position: mod.mesh.position.clone(),
+            rotationY: mod.rotationY,
+            attachedTo: mod.attachedTo
+        };
+
+        // Jeśli to narożnik, używamy typu uniwersalnego 'BAR_CORNER', aby dopasowywał się do nowego gniazda
+        const ghostKey = (mod.modelKey === 'BAR_CORNER_RIGHT' || mod.modelKey === 'BAR_CORNER_LEFT')
+            ? 'BAR_CORNER'
+            : mod.modelKey;
+
+        this.removeModule(mod);
+        this.startGhost(ghostKey);
+        this.ghostRotation = this.pickedUpOriginal.rotationY;
+        if (this.ghostModule) {
+            this.ghostModule.rotation.y = this.ghostRotation;
+        }
+
+        return this.pickedUpOriginal;
     }
 
     selectModule(moduleData) {
@@ -597,6 +645,9 @@ export class BarBuilder {
     commitGhost() {
         if (!this.ghostModule || !this.ghostModelKey) return null;
 
+        // Oznacz przenoszenie jako pomyślnie zakończone (nie przywracaj starego)
+        this.pickedUpOriginal = null;
+
         let mod = null;
         if (this.ghostSnapContext) {
             // Dołącz do przyciągniętego gniazda z pełnymi metadanymi i offsetem
@@ -629,6 +680,17 @@ export class BarBuilder {
             this.ghostModelKey = null;
             this.currentGhostMeshKey = null;
             this.ghostSnapContext = null;
+        }
+
+        // Jeśli obiekt był podniesiony (move) i użytkownik anulował akcję (ESC/PPM), przywróć go
+        if (this.pickedUpOriginal) {
+            const orig = this.pickedUpOriginal;
+            this.pickedUpOriginal = null;
+            const restored = this.addModule(orig.modelKey, orig.position, orig.rotationY);
+            if (restored) {
+                restored.attachedTo = orig.attachedTo;
+                this.selectModule(restored);
+            }
         }
     }
 
