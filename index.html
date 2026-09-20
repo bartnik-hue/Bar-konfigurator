@@ -49,6 +49,10 @@
             <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
             Branding / Grafika
         </button>
+        <button class="btn-tool" id="btn-open-led" title="Ustawienia podświetlenia LED (kolor i natężenie)">
+            <svg viewBox="0 0 24 24"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
+            Ustawienia LED
+        </button>
         <button class="btn-tool" id="btn-open-scene-settings" title="Ustawienia tła i oświetlenia sceny">
             <svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
             Ustawienia Sceny
@@ -68,6 +72,10 @@
         <button class="btn-tool" id="btn-load-project" title="Wczytaj układ z pliku JSON">
             <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
             Wczytaj Układ
+        </button>
+        <button class="btn-tool" id="btn-open-help" title="Instrukcja obsługi konfiguratora 3D">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
+            Pomoc
         </button>
         <input type="file" id="project-file-input" accept=".json" style="display: none;">
         <button class="btn-tool" id="btn-clear-scene" title="Wyczyść całą scenę">
@@ -388,6 +396,76 @@
         </div>
     </div>
 
+    <!-- WYSKIWANY PANEL BOCZNY: USTAWIENIA LED -->
+    <div class="side-panel" id="panel-led" style="width: 350px;">
+        <div class="panel-header">
+            <span class="panel-title">Podświetlenie LED</span>
+            <button class="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-content">
+            <!-- Włącz / wyłącz LED -->
+            <div class="scene-group" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div>
+                    <div style="font-weight: 600; font-size: 0.95rem; color: #fff;">Włącz LED</div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted);">Świecenie listew i elementów LED</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="led-enable-toggle" checked>
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+
+            <!-- Wygląd po wyłączeniu -->
+            <div class="scene-group" style="padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div class="scene-group-title" style="margin-bottom: 6px;">Gdy LED jest wyłączony</div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="panorama-mode-btn active" id="btn-led-off-invisible" title="Listwa LED staje się całkowicie niewidoczna / przezroczysta">
+                        Niewidoczna (Przezroczysta)
+                    </button>
+                    <button class="panorama-mode-btn" id="btn-led-off-black" title="Listwa LED przyjmuje matowy czarny profil">
+                        Czarny profil
+                    </button>
+                </div>
+            </div>
+
+            <!-- Paleta barw i kolor własny -->
+            <div class="scene-group">
+                <div class="scene-group-title">Kolor Światła LED</div>
+                <div class="color-presets-row" style="flex-wrap: wrap; gap: 8px;">
+                    <button class="color-chip led-chip active" data-color="#FACB7D" style="background: #FACB7D;" title="Złoty Artbar (3200K Warm Gold)"></button>
+                    <button class="color-chip led-chip" data-color="#FFE0B2" style="background: #FFE0B2;" title="Ciepły biały (3000K)"></button>
+                    <button class="color-chip led-chip" data-color="#FFFFFF" style="background: #FFFFFF;" title="Neutralny biały (4500K)"></button>
+                    <button class="color-chip led-chip" data-color="#D0E8FF" style="background: #D0E8FF;" title="Zimny biały (6500K)"></button>
+                    <button class="color-chip led-chip" data-color="#00D2FF" style="background: #00D2FF;" title="Cyjan / Neon Blue"></button>
+                    <button class="color-chip led-chip" data-color="#1A73E8" style="background: #1A73E8;" title="Głęboki błękit"></button>
+                    <button class="color-chip led-chip" data-color="#9C27B0" style="background: #9C27B0;" title="Fiolet / Purpura"></button>
+                    <button class="color-chip led-chip" data-color="#FF2A6D" style="background: #FF2A6D;" title="Neon Magenta / Róż"></button>
+                    <button class="color-chip led-chip" data-color="#E53935" style="background: #E53935;" title="Czerwień"></button>
+                    <button class="color-chip led-chip" data-color="#FFB300" style="background: #FFB300;" title="Bursztyn / Amber"></button>
+                    <button class="color-chip led-chip" data-color="#00E676" style="background: #00E676;" title="Limonka / Neon Green"></button>
+                    <input type="color" id="led-color-custom" value="#FACB7D" class="color-picker-input" title="Własny kolor LED">
+                </div>
+            </div>
+
+            <!-- Natężenie świecenia -->
+            <div class="scene-group">
+                <div class="scene-group-title">Natężenie Świecenia (Emisja)</div>
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Jasność LED:</span>
+                        <strong id="val-led-intensity">2.5</strong>
+                    </div>
+                    <input type="range" id="slider-led-intensity" min="0.2" max="8.0" step="0.1" value="2.5" class="scene-slider">
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
+                    <span>Dyskretne (0.2)</span>
+                    <span>Standard (2.5)</span>
+                    <span>Intensywny neon (8.0)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- WYSKIWANY PANEL BOCZNY: USTAWIENIA SCENY -->
     <div class="side-panel" id="panel-scene-settings">
         <div class="panel-header">
@@ -445,6 +523,30 @@
                     <input type="range" id="scene-light-elevation" min="15" max="85" step="1" value="55" class="scene-slider">
                 </div>
             </div>
+
+            <!-- Właściwości materiału podłogi -->
+            <div class="scene-group">
+                <div class="scene-group-title">Materiał Podłogi</div>
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Połysk / Chropowatość:</span>
+                        <strong id="val-floor-roughness">0.50 (Półmat)</strong>
+                    </div>
+                    <input type="range" id="slider-floor-roughness" min="0.05" max="1.0" step="0.01" value="0.50" class="scene-slider" title="0.05 = wysoki połysk / lustro, 1.0 = pełny mat">
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.70rem; color: var(--text-muted); margin-top: 2px;">
+                    <span>Wysoki połysk</span>
+                    <span>Półmat</span>
+                    <span>Pełny mat</span>
+                </div>
+                <div class="scene-control-row" style="margin-top: 8px;">
+                    <div class="scene-label-val">
+                        <span>Refleksyjność / Metaliczność:</span>
+                        <strong id="val-floor-metalness">0.20</strong>
+                    </div>
+                    <input type="range" id="slider-floor-metalness" min="0.0" max="0.8" step="0.01" value="0.20" class="scene-slider" title="Głębia i siła odbicia podłogi">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -500,10 +602,142 @@
         </div>
     </div>
 
+    <!-- MODAL OKNO: INSTRUKCJA I POMOC -->
+    <div class="modal-overlay" id="modal-help">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <div class="modal-header-icon">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="modal-title">Instrukcja Obsługi Konfiguratora Artbar</div>
+                        <div class="modal-subtitle">Poznaj najważniejsze funkcje, skróty klawiszowe oraz techniki projektowania barów modułowych</div>
+                    </div>
+                </div>
+                <button class="panel-close-btn" id="btn-close-help" title="Zamknij instrukcję">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="help-grid">
+                    <!-- KARTA 1: Nawigacja po scenie 3D -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">🎮</span>
+                            <span>Sterowanie Kamerą i Widok 3D</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li><span class="help-kbd">LPM</span> + przeciągnij – <strong>Obrót kamery</strong> wokół sceny.</li>
+                                <li><span class="help-kbd">PPM</span> lub <span class="help-kbd">ŚPM</span> + przeciągnij – <strong>Przesuwanie widoku</strong> (panowanie).</li>
+                                <li><span class="help-kbd">Rolka myszy</span> – <strong>Przybliżanie / oddalanie</strong> (Zoom).</li>
+                                <li><strong>Dolny pasek widoków:</strong> Szybkie przełączanie między <em>Widokiem 3D</em>, <em>Rzutem z góry</em> oraz <em>Widokiem Ortho</em>.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- KARTA 2: Wstawianie i łączenie magnetyczne -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">🧲</span>
+                            <span>Wstawianie i Łączenie Modułów</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li><strong>Dolny pasek:</strong> Kliknij przycisk modułu (<em>Bar Prosty</em>, <em>Róg</em>, <em>Regał</em>, <em>Lodówka</em>), by wstawić go na scenę.</li>
+                                <li><strong>Menu pod <span class="help-kbd">PPM</span>:</strong> Kliknij prawym przyciskiem myszy na siatce, by wstawić moduł w punkcie kursora.</li>
+                                <li><strong>Złote punkty łączenia:</strong> Po zaznaczeniu modułu kliknij złotą kropkę, aby natychmiast dostawić kolejny spasowany moduł.</li>
+                                <li><strong>Magnetyczne przyciąganie:</strong> Przy przesuwaniu moduły samoczynnie przyciągają się i łączą w stabilny ciąg barowy!</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- KARTA 3: Zaznaczanie, obracanie i usuwanie -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">↻</span>
+                            <span>Edycja, Obrót i Usuwanie</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li><span class="help-kbd">LPM</span> w moduł – Zaznacza element i wyświetla menu akcji nad barem.</li>
+                                <li><span class="help-kbd">R</span> lub przycisk <strong>Obróć</strong> – Obrót modułu o kąt 90°.</li>
+                                <li>Przycisk <strong>Przesuń</strong> – Zmiana położenia pojedynczego modułu.</li>
+                                <li>Przycisk <strong>Cały moduł</strong> – Przesuwa cały połączony bar wraz ze wszystkimi modułami.</li>
+                                <li><span class="help-kbd">Del</span> / <span class="help-kbd">Backspace</span> lub przycisk <strong>✕ Usuń</strong> – Usunięcie elementu.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- KARTA 4: Branding i tła panoramiczne -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">🎨</span>
+                            <span>Branding & Grafika Frontów</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li>Otwórz menu <strong>Branding / Grafika</strong> u góry ekranu.</li>
+                                <li><strong>Tło Frontów (Panorama):</strong> Wybierz ekskluzywny wzór z katalogu (np. Złoto, Kamienie Szlachetne, Graffiti) lub wgraj grafikę JPG/PNG.</li>
+                                <li><strong>Płynne łączenie na rogach:</strong> Grafika tworzy nieprzerwany, estetyczny ciąg wzdłuż całego baru i narożników.</li>
+                                <li><strong>Logotyp:</strong> Wgraj logo firmy, dopasuj skalę, szerokość oraz wysokość na frontach.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- KARTA 5: Podświetlenie LED -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">💡</span>
+                            <span>Podświetlenie LED i Efekty</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li>Otwórz menu <strong>Ustawienia LED</strong>.</li>
+                                <li>Włącz lub wyłącz podświetlenie listew neonowych przełącznikiem głównym.</li>
+                                <li>Wybierz kolor z dedykowanej palety (m.in. Złoty Artbar, Ciepły Biały, Neon Blue) lub wskaż własny kolor.</li>
+                                <li>Reguluj <strong>Jasność LED</strong> – światło rzuca realistyczne odbicia na posadzkę.</li>
+                                <li>Gdy LED jest wyłączony: wybierz profil przezroczysty lub elegancki matowy czarny.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- KARTA 6: Presety, Scena i Eksport -->
+                    <div class="help-card">
+                        <div class="help-card-header">
+                            <span class="help-card-icon">📋</span>
+                            <span>Gotowe Układy, Zapis i Podsumowanie</span>
+                        </div>
+                        <div class="help-card-body">
+                            <ul class="help-list">
+                                <li><strong>Gotowe Układy:</strong> Szybki start z gotowych konfiguracji (Prosty, L-Shape, Podkowa U, Wyspa 360°).</li>
+                                <li><strong>Ustawienia Sceny:</strong> Kolor tła, kąt słońca oraz stopień połysku podłogi (od lustra do matu).</li>
+                                <li><strong>Zapisz / Wczytaj Układ:</strong> Zapis projektu do pliku <code>.json</code> i natychmiastowe wczytanie.</li>
+                                <li><strong>Podsumowanie:</strong> Zestawienie ilości modułów, łączna długość frontu w metrach oraz druk specyfikacji.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <label class="modal-checkbox-label">
+                    <input type="checkbox" id="chk-dont-show-help" checked>
+                    <span>Nie pokazuj automatycznie przy uruchomieniu</span>
+                </label>
+                <button class="btn-tool active" id="btn-help-dismiss" style="padding: 10px 24px; font-size: 0.85rem;">
+                    <span>Rozpocznij projektowanie &rarr;</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST NOTIFICATIONS -->
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=34"></script>
+    <script type="module" src="js/app.js?v=43"></script>
 </body>
 </html>

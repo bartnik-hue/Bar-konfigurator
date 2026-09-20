@@ -292,8 +292,20 @@ export class ModelRegistry {
         mirroredWrapper.traverse(child => {
             if (child.isMesh) {
                 if (child.material) {
-                    child.material = child.material.clone();
-                    child.material.side = THREE.DoubleSide;
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(m => {
+                            const cloned = m.clone();
+                            cloned.side = THREE.DoubleSide;
+                            return cloned;
+                        });
+                    } else {
+                        child.material = child.material.clone();
+                        child.material.side = THREE.DoubleSide;
+                    }
+                }
+                if (child.userData.isCornerFront) {
+                    child.geometry = child.geometry.clone();
+                    this.normalizeCornerFrontUVs(child.geometry, true);
                 }
                 if (this.isBrandingTarget(child)) {
                     child.userData.isBrandingFront = true;
@@ -339,18 +351,127 @@ export class ModelRegistry {
         uv.needsUpdate = true;
     }
 
+    /**
+     * Rozwija i normalizuje współrzędne UV frontu narożnika (dwa skrzydła pod kątem 90°)
+     * wzdłuż pełnego obwodu lica (u od 0.0 na wejściu do 1.0 na wyjściu złącza)
+     */
+    normalizeCornerFrontUVs(geometry, isMirrored = false) {
+        if (!geometry || !geometry.attributes.position || !geometry.attributes.uv || !geometry.index) return;
+        const pos = geometry.attributes.position;
+        const uv = geometry.attributes.uv;
+        const indices = geometry.index.array;
+
+        // Wymiary narożnika w pliku rog.glb:
+        // Skrzydło 1: od wejścia X = -0.3302 do rogu X = 0.3822 (długość 0.7124m)
+        // Skrzydło 2: od rogu Z = 0.3400 do wyjścia Z = -0.3300 (długość 0.6700m)
+        const entranceX = -0.3302;
+        const cornerX = 0.3822;
+        const cornerZ = 0.3400;
+        const exitZ = -0.3300;
+
+        const L1 = cornerX - entranceX; // 0.7124m
+        const L2 = cornerZ - exitZ;     // 0.6700m
+        const totalL = L1 + L2;         // 1.3824m
+
+        const minY = 0.09708;
+        const maxY = 1.20000;
+        const spanY = maxY - minY;
+
+        // Zewnętrzne przednie lico narożnika to 24 indeksy (8 trójkątów, od 717 do 741).
+        // Indeksy 741..747 to wewnętrzna ścianka narożnika i pozostają przy materiale konstrukcyjnym 'frame'.
+        const startIndex = (geometry.index.count === 747) ? 717 : 0;
+        const endIndex = (geometry.index.count === 747) ? 741 : geometry.index.count;
+        const visited = new Set();
+
+        for (let i = startIndex; i < endIndex; i++) {
+            const idx = indices[i];
+            if (visited.has(idx)) continue;
+            visited.add(idx);
+
+            const px = pos.getX(idx);
+            const py = pos.getY(idx);
+            const pz = pos.getZ(idx);
+
+            let distAlong = 0;
+            if (pz >= 0.33) {
+                distAlong = Math.max(0, Math.min(L1, px - entranceX));
+            } else {
+                const distZ = cornerZ - pz;
+                distAlong = L1 + Math.max(0, Math.min(L2, distZ));
+            }
+
+            let u = distAlong / totalL;
+            if (isMirrored) {
+                u = 1.0 - u;
+            }
+            const v = Math.max(0, Math.min(1, (py - minY) / spanY));
+
+            uv.setXY(idx, u, v);
+        }
+        uv.needsUpdate = true;
+    }
+
     setupShadowsAndMaterials(root, modelKey) {
         root.traverse(child => {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
 
-                // Oznacz siatki z materiałem 'front' dla tła panoramicznego i znormalizuj ich UV
+                // Oznacz siatki z materiałem 'front', planszę baru prostego lub lico narożnika dla tła panoramicznego
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 const hasFrontMat = mats.some(m => m && (m.name === 'front' || m.name.toLowerCase().includes('front')));
+
+                const isFrontBoard = (child.name && (child.name.toLowerCase().includes('plansza') || child.name.toLowerCase().includes('barart.104'))) ||
+                                     (child.parent && child.parent.name && child.parent.name.toLowerCase().includes('plansza'));
+
+                const isCornerMesh = (child.name && child.name.toLowerCase().includes('barart.002')) ||
+                                     (child.geometry && child.geometry.index && child.geometry.index.count === 747);
+
                 if (hasFrontMat) {
                     child.userData.isFrontPanel = true;
                     this.normalizeFrontUVs(child.geometry);
+                } else if (isFrontBoard) {
+                    child.userData.isFrontPanel = true;
+                    const origMat = mats[0];
+                    const frontMat = origMat.clone();
+                    frontMat.name = 'front';
+                    frontMat.side = THREE.DoubleSide;
+                    origMat.name = 'frame';
+
+                    // W siatce BarArt.104 z 36 indeksami (12 trójkątów z Blender):
+                    // Pierwsze 6 indeksów (2 trójkąty) to dokładnie lico frontu (Z=0.024m), a pozostałe 30 to krawędzie i tył
+                    if (child.geometry && child.geometry.index && child.geometry.index.count === 36) {
+                        child.geometry.clearGroups();
+                        child.geometry.addGroup(0, 6, 0);  // Grupa 0: przednia ściana -> materiał 'front'
+                        child.geometry.addGroup(6, 30, 1); // Grupa 1: tył i krawędzie -> oryginalny materiał
+                        child.material = [frontMat, origMat];
+                    } else {
+                        child.material = frontMat;
+                    }
+                    this.normalizeFrontUVs(child.geometry);
+                } else if (isCornerMesh) {
+                    child.userData.isFrontPanel = true;
+                    child.userData.isCornerFront = true;
+                    const origMat = mats[0];
+                    const frontMat = origMat.clone();
+                    frontMat.name = 'front';
+                    frontMat.side = THREE.DoubleSide;
+                    origMat.name = 'frame';
+
+                    // W siatce BarArt.002 z 747 indeksami (249 trójkątów):
+                    // - Indeksy 0..717: korpus, blat i półki narożnika -> materiał 'frame'
+                    // - Indeksy 717..741 (24 indeksy / 8 trójkątów): ZEWNĘTRZNE lico narożnika -> materiał 'front'
+                    // - Indeksy 741..747 (6 indeksów / 2 trójkąty): WEWNĘTRZNA ścianka narożnika -> materiał 'frame' (brak grafiki wewnątrz)
+                    if (child.geometry && child.geometry.index && child.geometry.index.count === 747) {
+                        child.geometry.clearGroups();
+                        child.geometry.addGroup(0, 717, 0);  // Grupa 0: korpus i blat -> 'frame'
+                        child.geometry.addGroup(717, 24, 1); // Grupa 1: zewnętrzne lico -> 'front'
+                        child.geometry.addGroup(741, 6, 0);  // Grupa 2: wewnętrzna ścianka -> 'frame'
+                        child.material = [origMat, frontMat];
+                    } else {
+                        child.material = frontMat;
+                    }
+                    this.normalizeCornerFrontUVs(child.geometry, false);
                 }
 
                 // Oznacz siatki frontowe dla brandingu
@@ -358,11 +479,29 @@ export class ModelRegistry {
                     child.userData.isBrandingFront = true;
                 }
 
+                // Oznacz siatki z materiałem 'led' dla podświetlenia LED
+                const hasLedMat = mats.some(m => m && (m.name || '').toLowerCase().includes('led'));
+                if (hasLedMat) {
+                    child.userData.isLedMesh = true;
+                    mats.forEach(m => {
+                        if (m && (m.name || '').toLowerCase().includes('led')) {
+                            m.emissive = new THREE.Color('#FACB7D');
+                            m.emissiveIntensity = 2.5;
+                            m.color = new THREE.Color('#FACB7D');
+                            m.roughness = 0.2;
+                            m.metalness = 0.0;
+                        }
+                    });
+                }
+
                 if (child.material) {
-                    child.material.side = THREE.DoubleSide;
-                    if (child.material.map) {
-                        child.material.map.anisotropy = 8;
-                    }
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(m => {
+                        m.side = THREE.DoubleSide;
+                        if (m.map) {
+                            m.map.anisotropy = 8;
+                        }
+                    });
                 }
             }
         });

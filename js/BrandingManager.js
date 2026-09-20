@@ -138,45 +138,84 @@ export class BrandingManager {
     }
 
     /**
-     * Wykrywa ciągi modułów prostych stojących w jednej linii (lewy do prawego)
+     * Wykrywa ciągi modułów z frontem dekoracyjnym (bary proste i narożniki),
+     * łącząc je wzdłuż fizycznych styków złączy w przestrzeni 3D
      */
     detectBarChains() {
-        const straightBars = this.barBuilder.modules.filter(m => m.modelKey === 'BAR_STRAIGHT');
-        if (straightBars.length === 0) return [];
+        const frontModules = this.barBuilder.modules.filter(m => 
+            m.modelKey === 'BAR_STRAIGHT' ||
+            m.modelKey === 'BAR_CORNER_RIGHT' ||
+            m.modelKey === 'BAR_CORNER_LEFT' ||
+            m.modelKey === 'BAR_CORNER'
+        );
+        if (frontModules.length === 0) return [];
 
-        const barInfo = new Map();
-        straightBars.forEach(m => {
+        const threshold = 0.28; // promień tolerancji styków złączy
+
+        const getFrontInfo = (m) => {
             const rot = m.mesh.rotation.y;
             const pos = m.mesh.position;
-            // Złącze 'left' w przestrzeni lokalnej to -0.75m X, 'right' to +0.75m X
-            const leftSocket = new THREE.Vector3(-0.75, 0.5, 0)
-                .applyAxisAngle(new THREE.Vector3(0, 1, 0), rot)
-                .add(pos);
-            const rightSocket = new THREE.Vector3(0.75, 0.5, 0)
-                .applyAxisAngle(new THREE.Vector3(0, 1, 0), rot)
-                .add(pos);
+            let frontLength = 1.50;
+            let localIn = new THREE.Vector3(0, 0.5, 0);
+            let localOut = new THREE.Vector3(0, 0.5, 0);
 
-            barInfo.set(m.id, {
+            if (m.modelKey === 'BAR_STRAIGHT') {
+                frontLength = 1.50;
+                localIn.set(-0.75, 0.5, 0);
+                localOut.set(0.75, 0.5, 0);
+            } else if (m.modelKey === 'BAR_CORNER_RIGHT' || m.modelKey === 'BAR_CORNER') {
+                frontLength = 1.38;
+                localIn.set(-0.475, 0.5, 0);
+                localOut.set(0, 0.5, -0.475);
+            } else if (m.modelKey === 'BAR_CORNER_LEFT') {
+                frontLength = 1.38;
+                localIn.set(0.475, 0.5, 0);
+                localOut.set(0, 0.5, -0.475);
+            }
+
+            const worldIn = localIn.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rot).add(pos);
+            const worldOut = localOut.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rot).add(pos);
+
+            return {
+                id: m.id,
                 module: m,
-                leftSocket,
-                rightSocket,
-                leftNeighbor: null,
-                rightNeighbor: null
-            });
+                modelKey: m.modelKey,
+                frontLength,
+                worldIn,
+                worldOut,
+                connections: []
+            };
+        };
+
+        const frontInfos = new Map();
+        frontModules.forEach(m => {
+            frontInfos.set(m.id, getFrontInfo(m));
         });
 
-        // Wykryj styki między modułami w obrębie 20 cm i o zbliżonym obrocie
-        const threshold = 0.20;
-        for (const [idA, infoA] of barInfo.entries()) {
-            for (const [idB, infoB] of barInfo.entries()) {
-                if (idA === idB) continue;
-                if (infoA.rightSocket.distanceTo(infoB.leftSocket) < threshold) {
-                    const diffRot = Math.abs((infoA.module.mesh.rotation.y - infoB.module.mesh.rotation.y) % (2 * Math.PI));
-                    const angleOk = Math.min(diffRot, 2 * Math.PI - diffRot) < 0.25;
-                    if (angleOk) {
-                        infoA.rightNeighbor = infoB.module;
-                        infoB.leftNeighbor = infoA.module;
-                    }
+        // Wykryj wzajemne połączenia portów wejścia / wyjścia w przestrzeni świata
+        const infoList = Array.from(frontInfos.values());
+        for (let i = 0; i < infoList.length; i++) {
+            for (let j = i + 1; j < infoList.length; j++) {
+                const a = infoList[i];
+                const b = infoList[j];
+
+                const dOutIn = a.worldOut.distanceTo(b.worldIn);
+                const dInOut = a.worldIn.distanceTo(b.worldOut);
+                const dOutOut = a.worldOut.distanceTo(b.worldOut);
+                const dInIn = a.worldIn.distanceTo(b.worldIn);
+
+                if (dOutIn < threshold) {
+                    a.connections.push({ otherId: b.id, myPort: 'out', otherPort: 'in' });
+                    b.connections.push({ otherId: a.id, myPort: 'in', otherPort: 'out' });
+                } else if (dInOut < threshold) {
+                    a.connections.push({ otherId: b.id, myPort: 'in', otherPort: 'out' });
+                    b.connections.push({ otherId: a.id, myPort: 'out', otherPort: 'in' });
+                } else if (dOutOut < threshold) {
+                    a.connections.push({ otherId: b.id, myPort: 'out', otherPort: 'out' });
+                    b.connections.push({ otherId: a.id, myPort: 'out', otherPort: 'out' });
+                } else if (dInIn < threshold) {
+                    a.connections.push({ otherId: b.id, myPort: 'in', otherPort: 'in' });
+                    b.connections.push({ otherId: a.id, myPort: 'in', otherPort: 'in' });
                 }
             }
         }
@@ -184,73 +223,128 @@ export class BrandingManager {
         const visited = new Set();
         const chains = [];
 
-        // 1. Rozpocznij od głów (moduły nieposiadające sąsiada po lewej)
-        for (const [id, info] of barInfo.entries()) {
-            if (!info.leftNeighbor && !visited.has(info.module)) {
-                const chain = [];
-                let curr = info.module;
-                while (curr && !visited.has(curr)) {
-                    visited.add(curr);
-                    chain.push(curr);
-                    const currInfo = barInfo.get(curr.id);
-                    curr = currInfo?.rightNeighbor || null;
-                }
-                if (chain.length > 0) chains.push(chain);
-            }
-        }
+        // 1. Rozpocznij od końców ciągów (moduły ze stopniem połączeń <= 1)
+        const endpoints = infoList.filter(info => info.connections.length <= 1);
+        endpoints.forEach(startInfo => {
+            if (visited.has(startInfo.id)) return;
 
-        // 2. Moduły pozostałe (np. zapętlenia lub odosobnione)
-        for (const [id, info] of barInfo.entries()) {
-            if (!visited.has(info.module)) {
-                const chain = [];
-                let curr = info.module;
-                while (curr && !visited.has(curr)) {
-                    visited.add(curr);
-                    chain.push(curr);
-                    const currInfo = barInfo.get(curr.id);
-                    curr = currInfo?.rightNeighbor || null;
+            const chain = [];
+            let curr = startInfo;
+            let prevId = null;
+            let enterViaPort = (curr.connections.length === 1)
+                ? (curr.connections[0].myPort === 'out' ? 'in' : 'out')
+                : 'in';
+
+            while (curr && !visited.has(curr.id)) {
+                visited.add(curr.id);
+
+                const isReversed = (enterViaPort === 'out');
+                chain.push({
+                    module: curr.module,
+                    frontLength: curr.frontLength,
+                    isReversed: isReversed
+                });
+
+                const exitPort = isReversed ? 'in' : 'out';
+                const nextConn = curr.connections.find(c => c.otherId !== prevId && c.myPort === exitPort) ||
+                                 curr.connections.find(c => c.otherId !== prevId);
+
+                if (nextConn) {
+                    prevId = curr.id;
+                    enterViaPort = nextConn.otherPort;
+                    curr = frontInfos.get(nextConn.otherId);
+                } else {
+                    curr = null;
                 }
+            }
+
+            if (chain.length > 0) chains.push(chain);
+        });
+
+        // 2. Obsłuż pozostałe moduły (np. zapętlenia, wyspy lub zamknięte bary)
+        infoList.forEach(info => {
+            if (!visited.has(info.id)) {
+                const chain = [];
+                let curr = info;
+                let prevId = null;
+                let enterViaPort = 'in';
+
+                while (curr && !visited.has(curr.id)) {
+                    visited.add(curr.id);
+                    const isReversed = (enterViaPort === 'out');
+                    chain.push({
+                        module: curr.module,
+                        frontLength: curr.frontLength,
+                        isReversed: isReversed
+                    });
+
+                    const exitPort = isReversed ? 'in' : 'out';
+                    const nextConn = curr.connections.find(c => c.otherId !== prevId && c.myPort === exitPort) ||
+                                     curr.connections.find(c => c.otherId !== prevId);
+
+                    if (nextConn) {
+                        prevId = curr.id;
+                        enterViaPort = nextConn.otherPort;
+                        curr = frontInfos.get(nextConn.otherId);
+                    } else {
+                        curr = null;
+                    }
+                }
+
                 if (chain.length > 0) chains.push(chain);
             }
-        }
+        });
 
         return chains;
     }
 
     /**
-     * Główna funkcja aplikująca teksturę panoramiczną na fronty barów
-     * z ciągłym mapowaniem UV wzdłuż każdego ciągu
+     * Główna funkcja aplikująca teksturę panoramiczną na fronty barów i narożników
+     * z ciągłym, proporcjonalnym mapowaniem UV wzdłuż każdego ciągu
      */
     updateFrontPanoramas() {
         const chains = this.detectBarChains();
         const sharedTex = this.currentBackgroundTexture;
+        const processedModuleIds = new Set();
 
         chains.forEach(chain => {
-            const N = chain.length;
-            chain.forEach((moduleData, k) => {
-                this.applyPanoramaToModule(moduleData, sharedTex, k, N);
+            let accumMeters = 0;
+            chain.forEach(item => {
+                processedModuleIds.add(item.module.id);
+                this.applyPanoramaToModule(
+                    item.module,
+                    sharedTex,
+                    accumMeters,
+                    item.frontLength,
+                    item.isReversed
+                );
+                accumMeters += item.frontLength;
             });
         });
 
-        // Zresetuj moduły, które nie są prostymi barami (jeśli kiedykolwiek otrzymały tło)
+        // Zresetuj moduły, które nie są częścią frontu baru (np. regały zaplecza, lodówki)
         this.barBuilder.modules.forEach(m => {
-            if (m.modelKey !== 'BAR_STRAIGHT') {
+            if (!processedModuleIds.has(m.id)) {
                 this.restoreDefaultFrontMaterial(m);
             }
         });
     }
 
-    applyPanoramaToModule(moduleData, sharedTex, indexInChain = 0, chainLength = 1) {
+    applyPanoramaToModule(moduleData, sharedTex, accumMeters = 0, frontLengthMeters = 1.50, isReversed = false) {
         if (!moduleData || !moduleData.mesh) return;
 
         moduleData.mesh.traverse(child => {
             if (child.isMesh && child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(mat => {
-                    if (mat && (mat.name === 'front' || child.userData.isFrontPanel)) {
-                        // Zapisz oryginalną fabryczną teksturę
-                        if (!this.defaultFrontTextures.has(moduleData.id) && mat.map) {
-                            this.defaultFrontTextures.set(moduleData.id, mat.map);
+                    const isFrontMat = mat && (mat.name === 'front' || (!Array.isArray(child.material) && child.userData.isFrontPanel));
+                    if (isFrontMat) {
+                        // Zapisz oryginalną fabryczną teksturę i kolor
+                        if (!this.defaultFrontTextures.has(moduleData.id)) {
+                            this.defaultFrontTextures.set(moduleData.id, {
+                                map: mat.map || null,
+                                color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff)
+                            });
                         }
 
                         if (this.isBackgroundEnabled && sharedTex) {
@@ -260,23 +354,32 @@ export class BrandingManager {
                             texClone.wrapT = THREE.ClampToEdgeWrapping;
 
                             const span = this.backgroundSpanModules || 5;
+                            const spanMeters = span * 1.50; // np. 5 modułów po 1.5m = 7.50m
+
                             if (this.backgroundMode === 'chain') {
-                                // Grafika o stałej długości (np. 5 barów):
-                                // Każdy bar ma stałą 1/span szerokości wzoru (brak rozciągania/ściskania)
-                                // a po przekroczeniu pełnej długości (5 barów) płynnie się powtarza
-                                texClone.repeat.set(1 / span, 1);
-                                texClone.offset.set((indexInChain / span) % 1, 0);
+                                const fracWidth = frontLengthMeters / spanMeters;
+                                if (isReversed) {
+                                    texClone.repeat.set(-fracWidth, 1);
+                                    texClone.offset.set(((accumMeters + frontLengthMeters) / spanMeters) % 1.0, 0);
+                                } else {
+                                    texClone.repeat.set(fracWidth, 1);
+                                    texClone.offset.set((accumMeters / spanMeters) % 1.0, 0);
+                                }
                             } else {
                                 texClone.repeat.set(1, 1);
                                 texClone.offset.set(0, 0);
                             }
                             texClone.needsUpdate = true;
                             mat.map = texClone;
+                            mat.color.set(0xffffff);
                             mat.needsUpdate = true;
                         } else {
-                            // Przywróć fabryczną teksturę
-                            const defTex = this.defaultFrontTextures.get(moduleData.id) || null;
-                            mat.map = defTex;
+                            // Przywróć fabryczną teksturę i kolor
+                            const def = this.defaultFrontTextures.get(moduleData.id);
+                            mat.map = def ? (def.map || null) : null;
+                            if (def && def.color) {
+                                mat.color.copy(def.color);
+                            }
                             mat.needsUpdate = true;
                         }
                     }
@@ -291,9 +394,13 @@ export class BrandingManager {
             if (child.isMesh && child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(mat => {
-                    if (mat && (mat.name === 'front' || child.userData.isFrontPanel)) {
-                        const defTex = this.defaultFrontTextures.get(moduleData.id) || null;
-                        mat.map = defTex;
+                    const isFrontMat = mat && (mat.name === 'front' || (!Array.isArray(child.material) && child.userData.isFrontPanel));
+                    if (isFrontMat) {
+                        const def = this.defaultFrontTextures.get(moduleData.id);
+                        mat.map = def ? (def.map || null) : null;
+                        if (def && def.color) {
+                            mat.color.copy(def.color);
+                        }
                         mat.needsUpdate = true;
                     }
                 });

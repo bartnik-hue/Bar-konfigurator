@@ -112,13 +112,14 @@ export class BarBuilder {
     /**
      * Eksportuje stan układu wraz z bitmapą do obiektu JSON
      */
-    exportProject(brandingDataUrl = null, brandingSettings = null) {
+    exportProject(brandingDataUrl = null, brandingSettings = null, ledSettings = null) {
         return {
             app: 'ArtbarConfigurator',
             version: '1.0',
             savedAt: new Date().toISOString(),
             brandingDataUrl: brandingDataUrl,
             brandingSettings: brandingSettings,
+            ledSettings: ledSettings,
             modules: this.modules.map(m => ({
                 id: m.id,
                 modelKey: m.modelKey,
@@ -150,7 +151,8 @@ export class BarBuilder {
         this.notifyChange();
         return {
             brandingDataUrl: projectData.brandingDataUrl || null,
-            brandingSettings: projectData.brandingSettings || null
+            brandingSettings: projectData.brandingSettings || null,
+            ledSettings: projectData.ledSettings || null
         };
     }
 
@@ -408,11 +410,21 @@ export class BarBuilder {
             mesh.rotation.y = item.relRot;
 
             mesh.traverse(child => {
-                if (child.isMesh) {
-                    child.material = child.material.clone();
-                    child.material.transparent = true;
-                    child.material.opacity = 0.55;
-                    child.material.depthWrite = false;
+                if (child.isMesh && child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material = child.material.map(m => {
+                            const cloned = m.clone();
+                            cloned.transparent = true;
+                            cloned.opacity = 0.55;
+                            cloned.depthWrite = false;
+                            return cloned;
+                        });
+                    } else {
+                        child.material = child.material.clone();
+                        child.material.transparent = true;
+                        child.material.opacity = 0.55;
+                        child.material.depthWrite = false;
+                    }
                 }
             });
 
@@ -779,11 +791,21 @@ export class BarBuilder {
 
         // Ustaw półprzezroczysty materiał podglądu (ghost)
         mesh.traverse(child => {
-            if (child.isMesh) {
-                child.material = child.material.clone();
-                child.material.transparent = true;
-                child.material.opacity = 0.55;
-                child.material.depthWrite = false;
+            if (child.isMesh && child.material) {
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(m => {
+                        const cloned = m.clone();
+                        cloned.transparent = true;
+                        cloned.opacity = 0.55;
+                        cloned.depthWrite = false;
+                        return cloned;
+                    });
+                } else {
+                    child.material = child.material.clone();
+                    child.material.transparent = true;
+                    child.material.opacity = 0.55;
+                    child.material.depthWrite = false;
+                }
             }
         });
 
@@ -861,7 +883,10 @@ export class BarBuilder {
         if (!this.ghostModule) return;
         this.ghostModule.traverse(child => {
             if (child.isMesh && child.material) {
-                child.material.opacity = isSnapped ? 0.85 : 0.55;
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                mats.forEach(m => {
+                    m.opacity = isSnapped ? 0.85 : 0.55;
+                });
             }
         });
     }

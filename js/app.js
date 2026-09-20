@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ModelRegistry } from './ModelRegistry.js';
 import { BarBuilder } from './BarBuilder.js';
 import { BrandingManager } from './BrandingManager.js';
+import { LedManager } from './LedManager.js';
 import { CalibrationTool } from './CalibrationTool.js';
 
 class ArtbarApp {
@@ -19,14 +20,18 @@ class ArtbarApp {
         this.registry = new ModelRegistry();
         this.barBuilder = new BarBuilder(this.scene, this.camera, this.renderer, this.registry, (stats) => this.updateUIStats(stats));
         this.brandingManager = new BrandingManager(this.barBuilder, this.registry);
+        this.ledManager = new LedManager(this.barBuilder, this.registry);
 
-        // Automatyczne nakładanie bieżącego brandingu i tła na nowo dodawane moduły
+        // Automatyczne nakładanie bieżącego brandingu, tła i LED na nowo dodawane moduły
         this.barBuilder.onModuleAdded = (moduleData) => {
             if (this.brandingManager.currentTexture) {
                 this.brandingManager.applyToModule(moduleData, this.brandingManager.currentTexture);
             }
             if (this.brandingManager.isBackgroundEnabled) {
                 this.brandingManager.updateFrontPanoramas();
+            }
+            if (this.ledManager) {
+                this.ledManager.applyToModule(moduleData);
             }
         };
 
@@ -199,12 +204,12 @@ class ArtbarApp {
     }
 
     initEnvironment() {
-        // Elegancka studyjna posadzka o delikatnym połysku
+        // Elegancka studyjna posadzka z konfigurowalnym połyskiem
         const floorGeom = new THREE.PlaneGeometry(80, 80);
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0x171717,
-            roughness: 0.5,
-            metalness: 0.2
+            roughness: 0.50,
+            metalness: 0.20
         });
         this.floorMesh = new THREE.Mesh(floorGeom, floorMat);
         this.floorMesh.rotation.x = -Math.PI / 2;
@@ -228,6 +233,7 @@ class ArtbarApp {
 
             // Załaduj domyślny preset (Układ Prosty) na start
             this.barBuilder.loadPreset('straight');
+            this.ledManager.applyToAll();
             this.showToast('Wczytano modele 3D oraz przykładowy układ baru Artbar.');
         } catch (err) {
             console.error('Błąd podczas inicjalizacji modeli:', err);
@@ -262,6 +268,11 @@ class ArtbarApp {
                 this.barBuilder.removeSelected();
                 this.hideRadialMenu();
             } else if (e.key === 'Escape') {
+                const modalHelp = document.getElementById('modal-help');
+                if (modalHelp && modalHelp.classList.contains('visible')) {
+                    if (this.closeHelpModal) this.closeHelpModal();
+                    return;
+                }
                 this.barBuilder.cancelGhost();
                 this.barBuilder.deselectModule();
                 this.hideContextMenu();
@@ -288,6 +299,7 @@ class ArtbarApp {
     }
 
     onMouseMove(e) {
+        if (document.getElementById('modal-help')?.classList.contains('visible')) return;
         this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -302,6 +314,7 @@ class ArtbarApp {
 
     onPointerDown(e) {
         if (e.button !== 0) return;
+        if (document.getElementById('modal-help')?.classList.contains('visible')) return;
         this.pointerDownPos = { x: e.clientX, y: e.clientY, time: performance.now() };
     }
 
@@ -309,10 +322,14 @@ class ArtbarApp {
         // Tylko LPM (przycisk 0)
         if (e.button !== 0) return;
 
+        // Jeśli modal pomocy jest otwarty, ignoruj interakcje ze sceną
+        if (document.getElementById('modal-help')?.classList.contains('visible')) return;
+
         // Jeśli kliknięto w elementy UI, ignoruj
         if (e.target.closest('.top-header') || e.target.closest('.top-actions') || 
             e.target.closest('.bottom-controls') || e.target.closest('.side-panel') || 
-            e.target.closest('#context-menu') || e.target.closest('#radial-action-menu')) {
+            e.target.closest('#context-menu') || e.target.closest('#radial-action-menu') ||
+            e.target.closest('.modal-overlay')) {
             return;
         }
 
@@ -377,6 +394,9 @@ class ArtbarApp {
 
     onContextMenu(e) {
         e.preventDefault();
+
+        // Jeśli modal pomocy jest otwarty, ignoruj
+        if (document.getElementById('modal-help')?.classList.contains('visible')) return;
 
         // Jeśli jesteśmy w trybie ghosta, PPM anuluje ghosta
         if (this.barBuilder.ghostModule) {
@@ -648,7 +668,16 @@ class ArtbarApp {
         document.getElementById('btn-save-project').addEventListener('click', () => {
             try {
                 const brandingSettings = this.brandingManager.getSettings();
-                const projectData = this.barBuilder.exportProject(this.brandingManager.currentDataUrl, brandingSettings);
+                const ledSettings = this.ledManager.getSettings();
+                const projectData = this.barBuilder.exportProject(
+                    this.brandingManager.currentDataUrl,
+                    brandingSettings,
+                    ledSettings
+                );
+                projectData.floorSettings = {
+                    roughness: this.floorMesh?.material?.roughness ?? 0.50,
+                    metalness: this.floorMesh?.material?.metalness ?? 0.20
+                };
                 const jsonStr = JSON.stringify(projectData, null, 2);
                 const blob = new Blob([jsonStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -690,9 +719,36 @@ class ArtbarApp {
                     const imported = this.barBuilder.importProject(projectData);
                     const savedBitmap = (typeof imported === 'string') ? imported : imported?.brandingDataUrl;
                     const savedSettings = (typeof imported === 'object') ? imported?.brandingSettings : null;
+                    const savedLedSettings = (typeof imported === 'object') ? imported?.ledSettings : null;
 
                     if (savedSettings) {
                         this.brandingManager.applySettings(savedSettings);
+                    }
+
+                    if (savedLedSettings) {
+                        this.ledManager.applySettings(savedLedSettings);
+                    }
+
+                    if (projectData.floorSettings) {
+                        const r = projectData.floorSettings.roughness;
+                        const m = projectData.floorSettings.metalness;
+                        if (r !== undefined && this.floorMesh?.material) {
+                            this.floorMesh.material.roughness = r;
+                            const slider = document.getElementById('slider-floor-roughness');
+                            if (slider) slider.value = r;
+                            const valLabel = document.getElementById('val-floor-roughness');
+                            if (valLabel) {
+                                let desc = (r < 0.25) ? ' (Wysoki połysk)' : (r < 0.6 ? ' (Półmat)' : ' (Matowa)');
+                                valLabel.textContent = `${r.toFixed(2)}${desc}`;
+                            }
+                        }
+                        if (m !== undefined && this.floorMesh?.material) {
+                            this.floorMesh.material.metalness = m;
+                            const slider = document.getElementById('slider-floor-metalness');
+                            if (slider) slider.value = m;
+                            const valLabel = document.getElementById('val-floor-metalness');
+                            if (valLabel) valLabel.textContent = m.toFixed(2);
+                        }
                     }
 
                     if (savedBitmap) {
@@ -724,9 +780,13 @@ class ArtbarApp {
         // Panele boczne
         this.setupSidePanel('btn-open-presets', 'panel-presets');
         this.setupSidePanel('btn-open-branding', 'panel-branding');
+        this.setupSidePanel('btn-open-led', 'panel-led');
         this.setupSidePanel('btn-open-scene-settings', 'panel-scene-settings');
         this.setupSidePanel('btn-open-calib', 'panel-calibration');
         this.setupSidePanel('btn-open-summary', 'panel-summary');
+
+        // Modal pomocy i instrukcji
+        this.setupHelpModal();
 
         // Presety gotowych układów baru
         document.querySelectorAll('.preset-card').forEach(card => {
@@ -972,21 +1032,98 @@ class ArtbarApp {
             this.showToast('Dopasowano rozmiar do oryginalnych proporcji pliku graficznego.');
         });
 
-        // Ustawienia Sceny (Tło, Światło, Kierunek)
-        document.querySelectorAll('.color-chip').forEach(chip => {
+        // ==========================================
+        // USTAWIENIA LED
+        // ==========================================
+        const ledToggle = document.getElementById('led-enable-toggle');
+        ledToggle?.addEventListener('change', (e) => {
+            this.ledManager.setEnabled(e.target.checked);
+            this.showToast(e.target.checked ? 'Włączono podświetlenie LED.' : 'Wyłączono podświetlenie LED.');
+        });
+
+        const ledChips = document.querySelectorAll('#panel-led .led-chip');
+        const ledCustomInput = document.getElementById('led-color-custom');
+        ledChips.forEach(chip => {
             chip.addEventListener('click', () => {
-                document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+                ledChips.forEach(c => c.classList.remove('active'));
                 chip.classList.add('active');
                 const col = chip.dataset.color;
-                const customInput = document.getElementById('scene-bg-custom');
-                if (customInput) customInput.value = col;
+                if (ledCustomInput) ledCustomInput.value = col;
+                this.ledManager.setColor(col);
+            });
+        });
+
+        ledCustomInput?.addEventListener('input', (e) => {
+            ledChips.forEach(c => c.classList.remove('active'));
+            this.ledManager.setColor(e.target.value);
+        });
+
+        const ledSlider = document.getElementById('slider-led-intensity');
+        const valLedIntensity = document.getElementById('val-led-intensity');
+        ledSlider?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (valLedIntensity) valLedIntensity.textContent = val.toFixed(1);
+            this.ledManager.setIntensity(val);
+        });
+
+        // Wygląd elementów LED po wyłączeniu (niewidoczne vs czarny profil)
+        const btnLedOffInvisible = document.getElementById('btn-led-off-invisible');
+        const btnLedOffBlack = document.getElementById('btn-led-off-black');
+
+        btnLedOffInvisible?.addEventListener('click', () => {
+            btnLedOffInvisible.classList.add('active');
+            btnLedOffBlack?.classList.remove('active');
+            this.ledManager.setOffAppearance('invisible');
+            this.showToast('Gdy LED wyłączony: elementy są niewidoczne.');
+        });
+
+        btnLedOffBlack?.addEventListener('click', () => {
+            btnLedOffBlack.classList.add('active');
+            btnLedOffInvisible?.classList.remove('active');
+            this.ledManager.setOffAppearance('black');
+            this.showToast('Gdy LED wyłączony: czarny profil matowy.');
+        });
+
+        // Synchronizacja UI przy zmianie ustawień LED (np. po wczytaniu projektu)
+        this.ledManager.onLedChanged = (settings) => {
+            if (ledToggle) ledToggle.checked = !!settings.enabled;
+            if (valLedIntensity) valLedIntensity.textContent = Number(settings.intensity).toFixed(1);
+            if (ledSlider) ledSlider.value = settings.intensity;
+            if (ledCustomInput) ledCustomInput.value = settings.color;
+
+            if (settings.offAppearance === 'black') {
+                btnLedOffBlack?.classList.add('active');
+                btnLedOffInvisible?.classList.remove('active');
+            } else {
+                btnLedOffInvisible?.classList.add('active');
+                btnLedOffBlack?.classList.remove('active');
+            }
+
+            ledChips.forEach(chip => {
+                if ((chip.dataset.color || '').toLowerCase() === (settings.color || '').toLowerCase()) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            });
+        };
+
+        // Ustawienia Sceny (Tło, Światło, Kierunek)
+        const sceneColorChips = document.querySelectorAll('#panel-scene-settings .color-chip');
+        const bgCustomInput = document.getElementById('scene-bg-custom');
+
+        sceneColorChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                sceneColorChips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                const col = chip.dataset.color;
+                if (bgCustomInput) bgCustomInput.value = col;
                 this.setSceneBackgroundColor(col);
             });
         });
 
-        const bgCustomInput = document.getElementById('scene-bg-custom');
         bgCustomInput?.addEventListener('input', (e) => {
-            document.querySelectorAll('.color-chip').forEach(c => c.classList.remove('active'));
+            sceneColorChips.forEach(c => c.classList.remove('active'));
             this.setSceneBackgroundColor(e.target.value);
         });
 
@@ -1022,6 +1159,37 @@ class ArtbarApp {
             this.lightElevation = val;
             if (valLightElevation) valLightElevation.textContent = `${val}°`;
             this.updateMainLightPosition();
+        });
+
+        // Właściwości materiału podłogi (Połysk / Chropowatość i Refleksyjność)
+        const floorRoughnessSlider = document.getElementById('slider-floor-roughness');
+        const valFloorRoughness = document.getElementById('val-floor-roughness');
+        floorRoughnessSlider?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (this.floorMesh?.material) {
+                this.floorMesh.material.roughness = val;
+                this.floorMesh.material.needsUpdate = true;
+            }
+            if (valFloorRoughness) {
+                let desc = '';
+                if (val < 0.25) desc = ' (Wysoki połysk)';
+                else if (val < 0.6) desc = ' (Półmat)';
+                else desc = ' (Matowa)';
+                valFloorRoughness.textContent = `${val.toFixed(2)}${desc}`;
+            }
+        });
+
+        const floorMetalnessSlider = document.getElementById('slider-floor-metalness');
+        const valFloorMetalness = document.getElementById('val-floor-metalness');
+        floorMetalnessSlider?.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (this.floorMesh?.material) {
+                this.floorMesh.material.metalness = val;
+                this.floorMesh.material.needsUpdate = true;
+            }
+            if (valFloorMetalness) {
+                valFloorMetalness.textContent = val.toFixed(2);
+            }
         });
 
         // Drukuj zestawienie
@@ -1066,6 +1234,10 @@ class ArtbarApp {
             document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
 
             if (!isCurrentlyOpen) {
+                // Zamknij modal pomocy jeśli był otwarty
+                document.getElementById('modal-help')?.classList.remove('visible');
+                document.getElementById('btn-open-help')?.classList.remove('active');
+
                 panel.style.display = 'flex';
                 btn.classList.add('active');
             }
@@ -1076,6 +1248,69 @@ class ArtbarApp {
                 panel.style.display = 'none';
                 btn.classList.remove('active');
             });
+        }
+    }
+
+    setupHelpModal() {
+        const modalHelp = document.getElementById('modal-help');
+        const btnOpen = document.getElementById('btn-open-help');
+        const btnClose = document.getElementById('btn-close-help');
+        const btnDismiss = document.getElementById('btn-help-dismiss');
+        const chkDontShow = document.getElementById('chk-dont-show-help');
+
+        if (!modalHelp) return;
+
+        this.openHelpModal = () => {
+            // Zamknij ewentualnie otwarte panele boczne
+            document.querySelectorAll('.side-panel').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.btn-tool').forEach(b => b.classList.remove('active'));
+            btnOpen?.classList.add('active');
+
+            const hasSeen = localStorage.getItem('artbar_has_seen_help') === '1';
+            if (chkDontShow) chkDontShow.checked = hasSeen;
+            modalHelp.classList.add('visible');
+        };
+
+        this.closeHelpModal = () => {
+            if (chkDontShow && chkDontShow.checked) {
+                localStorage.setItem('artbar_has_seen_help', '1');
+            } else {
+                localStorage.removeItem('artbar_has_seen_help');
+            }
+            modalHelp.classList.remove('visible');
+            btnOpen?.classList.remove('active');
+        };
+
+        btnOpen?.addEventListener('click', () => {
+            if (modalHelp.classList.contains('visible')) {
+                this.closeHelpModal();
+            } else {
+                this.openHelpModal();
+            }
+        });
+
+        btnClose?.addEventListener('click', () => {
+            this.closeHelpModal();
+        });
+
+        btnDismiss?.addEventListener('click', () => {
+            this.closeHelpModal();
+        });
+
+        // Kliknięcie w tło modala (poza oknem) zamyka okno
+        modalHelp.addEventListener('click', (e) => {
+            if (e.target === modalHelp) {
+                this.closeHelpModal();
+            }
+        });
+
+        // Sprawdzenie pierwszego wejścia do konfiguratora
+        const hasSeenHelp = localStorage.getItem('artbar_has_seen_help');
+        if (!hasSeenHelp) {
+            // Pierwsze wejście: otwórz okno pomocy z zaznaczonym domyślnie checkboxem "Nie pokazuj przy uruchomieniu"
+            if (chkDontShow) chkDontShow.checked = true;
+            modalHelp.classList.add('visible');
+            btnOpen?.classList.add('active');
         }
     }
 
