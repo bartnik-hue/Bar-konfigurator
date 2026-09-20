@@ -1033,7 +1033,7 @@ class ArtbarApp {
             const toggle = document.getElementById('toggle-panorama-enable');
             if (toggle && !toggle.checked) toggle.checked = true;
             document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
-            this.showToast('Wgrano własną grafikę panoramiczną na fronty baru!');
+            this.showToast('Wgrano własną grafikę na fronty baru!');
         });
     }
 
