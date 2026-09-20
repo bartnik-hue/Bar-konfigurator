@@ -342,7 +342,7 @@ body, html {
     background: transparent;
     border: 1px solid transparent;
     color: var(--text-main);
-    padding: 8px 14px;
+    padding: 7px 12px;
     border-radius: var(--radius-sm);
     font-size: 0.8rem;
     font-weight: 500;
@@ -350,7 +350,24 @@ body, html {
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.hud-btn svg.hud-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease, stroke 0.2s ease;
+}
+
+.hud-btn:hover svg.hud-icon {
+    transform: scale(1.12);
+    stroke: var(--primary);
 }
 
 .hud-btn:hover {
