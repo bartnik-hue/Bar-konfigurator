@@ -126,11 +126,6 @@ export class BrandingManager {
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.ClampToEdgeWrapping;
             texture.flipY = true;
-            texture.generateMipmaps = true;
-            texture.minFilter = THREE.LinearMipmapLinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            const maxAniso = this.barBuilder?.renderer?.capabilities?.getMaxAnisotropy() || 16;
-            texture.anisotropy = maxAniso;
             this.currentBackgroundTexture = texture;
             if (onReady) onReady(texture);
         });
@@ -392,11 +387,6 @@ export class BrandingManager {
                                 texClone = sharedTex.clone();
                                 texClone.wrapS = THREE.RepeatWrapping;
                                 texClone.wrapT = THREE.ClampToEdgeWrapping;
-                                texClone.generateMipmaps = true;
-                                texClone.minFilter = THREE.LinearMipmapLinearFilter;
-                                texClone.magFilter = THREE.LinearFilter;
-                                const maxAniso = this.barBuilder?.renderer?.capabilities?.getMaxAnisotropy() || 16;
-                                texClone.anisotropy = maxAniso;
                                 mat.map = texClone;
                             }
 

@@ -146,9 +146,9 @@ export class ModelRegistry {
 
     async loadAllModels(onProgress) {
         const modelsToLoad = [
-            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb?v=4',     label: 'Moduł prosty baru' },
-            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=4',          label: 'Narożnik' },
-            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb?v=4',        label: 'Regał zaplecza' }
+            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb?v=5',     label: 'Moduł prosty baru' },
+            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=5',          label: 'Narożnik' },
+            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb?v=5',        label: 'Regał zaplecza' }
         ];
 
         let loadedCount = 0;
@@ -424,7 +424,7 @@ export class ModelRegistry {
             if (child.isMesh) {
                 // Całkowicie wyklucz zduplikowaną w Blenderze planszę PLANSZA.001 (BarArt.001) z pliku BarModel.glb.
                 // PLANSZA.001 nakłada się w 100% na planszę właściwą PLANSZA.004 (BarArt.104), wywołując Z-fighting i gwałtowne drganie tekstur.
-                if (child.name === 'BarArt.001' || (child.parent && child.parent.name === 'PLANSZA.001')) {
+                if (child.name && (child.name.toLowerCase().includes('plansza.001') || child.name.toLowerCase().includes('barart.001'))) {
                     child.visible = false;
                     child.castShadow = false;
                     child.receiveShadow = false;
@@ -462,9 +462,9 @@ export class ModelRegistry {
                     const origMat = mats[0];
                     const frontMat = origMat.clone();
                     frontMat.name = 'front';
-                    frontMat.side = THREE.FrontSide;
+                    frontMat.side = THREE.DoubleSide;
                     origMat.name = 'frame';
-                    origMat.side = THREE.FrontSide;
+                    origMat.side = THREE.DoubleSide;
 
                     // W siatce BarArt.104 z 36 indeksami (12 trójkątów z Blender):
                     // Pierwsze 6 indeksów (2 trójkąty) to dokładnie lico frontu (Z=0.024m), a pozostałe 30 to krawędzie i tył
@@ -521,8 +521,9 @@ export class ModelRegistry {
                 if (child.material) {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
                     mats.forEach(m => {
+                        m.side = THREE.DoubleSide;
                         if (m.map) {
-                            m.map.anisotropy = 16;
+                            m.map.anisotropy = 8;
                         }
                     });
                 }
