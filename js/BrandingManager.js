@@ -87,6 +87,7 @@ export class BrandingManager {
             const dataUrl = e.target.result;
             this.activePresetId = null;
             this.currentBackgroundUrl = dataUrl;
+            this.aiMetadata = null;
             this.loadBackgroundTexture(dataUrl, (texture) => {
                 this.isBackgroundEnabled = true;
                 this.updateFrontPanoramas();
@@ -95,6 +96,22 @@ export class BrandingManager {
             });
         };
         reader.readAsDataURL(file);
+    }
+
+    /**
+     * Wczytuje wygenerowaną grafikę z generatora AI (Stable Diffusion)
+     */
+    applyAiTexture(dataUrl, metadata = null, onLoaded = null) {
+        if (!dataUrl) return;
+        this.activePresetId = null;
+        this.currentBackgroundUrl = dataUrl;
+        this.aiMetadata = metadata;
+        this.loadBackgroundTexture(dataUrl, (texture) => {
+            this.isBackgroundEnabled = true;
+            this.updateFrontPanoramas();
+            this.notifyBackgroundChanged();
+            if (onLoaded) onLoaded(dataUrl);
+        });
     }
 
     loadBackgroundTexture(url, onReady = null) {
@@ -133,6 +150,7 @@ export class BrandingManager {
         this.currentBackgroundUrl = null;
         this.currentBackgroundTexture = null;
         this.activePresetId = null;
+        this.aiMetadata = null;
         this.updateFrontPanoramas();
         this.notifyBackgroundChanged();
     }
@@ -639,7 +657,8 @@ export class BrandingManager {
                 url: this.currentBackgroundUrl,
                 presetId: this.activePresetId,
                 mode: this.backgroundMode,
-                spanModules: this.backgroundSpanModules
+                spanModules: this.backgroundSpanModules,
+                aiMetadata: this.aiMetadata || null
             },
             logo: {
                 baseWidth: this.baseWidth,
@@ -662,6 +681,7 @@ export class BrandingManager {
             this.backgroundMode = bg.mode || 'chain';
             this.activePresetId = bg.presetId || null;
             if (bg.spanModules !== undefined) this.backgroundSpanModules = bg.spanModules;
+            if (bg.aiMetadata) this.aiMetadata = bg.aiMetadata;
             if (bg.url) {
                 this.currentBackgroundUrl = bg.url;
                 this.loadBackgroundTexture(bg.url, (tex) => {

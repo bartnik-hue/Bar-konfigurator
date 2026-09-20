@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Artbar Solutions - Konfigurator Barów Eventowych 3D</title>
-    <link rel="stylesheet" href="css/style.css?v=46">
+    <link rel="stylesheet" href="css/style.css?v=47">
     <!-- Google Fonts: Montserrat & Cinzel dla luksusowego wyglądu -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -300,6 +300,101 @@
                     <div class="panorama-card" data-preset="zloto" style="grid-column: span 2;">
                         <img class="panorama-thumb" src="grafiki/zloto.jpg" alt="Złota Elegancja">
                         <span class="panorama-title">Złota Elegancja</span>
+                    </div>
+                </div>
+
+                <!-- PODSEKCJA AI: GENERATOR TEŁ STABLE DIFFUSION -->
+                <div class="ai-generator-box" id="ai-generator-box">
+                    <div class="ai-box-header">
+                        <div class="ai-box-title">
+                            <span class="ai-sparkle-icon">✨</span>
+                            <span>Generator Tła AI (Stable Diffusion)</span>
+                        </div>
+                        <button class="ai-settings-toggle-btn" id="btn-ai-toggle-settings" title="Ustawienia silnika AI (Klucz API / Lokalne WebUI / Demo)">
+                            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Panel ustawień silnika (ukrywany/rozwijany) -->
+                    <div class="ai-settings-dropdown" id="ai-settings-panel" style="display: none;">
+                        <div class="ai-setting-row">
+                            <label class="ai-setting-label">Źródło AI:</label>
+                            <select id="ai-select-provider" class="scene-select">
+                                <option value="demo">Szybki Tryb Demo (bez kluczy)</option>
+                                <option value="cloud">Stability AI Chmura (SDXL API)</option>
+                                <option value="local">Lokalny AUTOMATIC1111 (GPU)</option>
+                            </select>
+                        </div>
+                        <div class="ai-setting-row" id="ai-row-cloud-key" style="display: none;">
+                            <label class="ai-setting-label">Klucz Stability API:</label>
+                            <input type="password" id="ai-input-api-key" placeholder="sk-..." class="ai-input-text" autocomplete="off">
+                            <span class="ai-hint-small">Zapisywany tylko lokalnie w przeglądarce.</span>
+                        </div>
+                        <div class="ai-setting-row" id="ai-row-local-url" style="display: none;">
+                            <label class="ai-setting-label">Adres lokalnego WebUI:</label>
+                            <input type="text" id="ai-input-local-url" value="http://127.0.0.1:7860" class="ai-input-text">
+                            <span class="ai-hint-small">Uruchom: webui-user.bat --api --cors-allow-origins="*"</span>
+                        </div>
+                    </div>
+
+                    <!-- Style architektoniczne -->
+                    <div class="ai-styles-label">Wybierz styl architektoniczny:</div>
+                    <div class="ai-styles-grid" id="ai-styles-container"></div>
+
+                    <!-- Własny prompt / opis detali -->
+                    <div class="ai-prompt-container">
+                        <textarea id="ai-prompt-input" class="ai-prompt-textarea" rows="2" placeholder="Opcjonalnie: dodaj własne detale (np. szmaragdowy marmur, złoty pył, liście palmowe)..."></textarea>
+                    </div>
+
+                    <!-- Opcje zaawansowane: bezszwowość i format -->
+                    <div class="ai-options-row">
+                        <label class="ai-checkbox-label" title="Włącza splot kołowy - lewa i prawa krawędź łączą się bezszwowo w nieskończony wzór">
+                            <input type="checkbox" id="ai-toggle-seamless" checked>
+                            <span>Wzór bezszwowy (Seamless tile)</span>
+                        </label>
+                        <select id="ai-select-aspect" class="scene-select" style="width: auto; padding: 2px 6px; font-size: 0.70rem;">
+                            <option value="panorama">Panorama (1536×640)</option>
+                            <option value="square">Kwadrat (1024×1024)</option>
+                        </select>
+                    </div>
+
+                    <!-- Przycisk generowania -->
+                    <button class="ai-generate-btn" id="btn-ai-generate">
+                        <span class="ai-btn-icon">⚡</span>
+                        <span id="ai-generate-btn-text">Generuj tło frontu AI</span>
+                    </button>
+
+                    <!-- Pasek postępu -->
+                    <div class="ai-progress-box" id="ai-progress-box" style="display: none;">
+                        <div class="ai-progress-bar">
+                            <div class="ai-progress-fill" id="ai-progress-fill" style="width: 0%;"></div>
+                        </div>
+                        <div class="ai-progress-status" id="ai-progress-status">Przygotowywanie generacji...</div>
+                    </div>
+
+                    <!-- Podgląd i akcje -->
+                    <div class="ai-preview-box" id="ai-preview-box" style="display: none;">
+                        <div class="ai-preview-wrapper">
+                            <img id="ai-preview-img" class="ai-preview-thumb" src="" alt="Podgląd grafiki AI">
+                            <div class="ai-preview-badge" id="ai-preview-badge">Aktywne na barze 3D</div>
+                        </div>
+                        <div class="ai-actions-row">
+                            <button class="btn-tool active" id="btn-ai-apply" title="Zastosuj tę grafikę na barach w scenie 3D">
+                                <span>Zastosuj na 3D</span>
+                            </button>
+                            <button class="btn-tool" id="btn-ai-reroll" title="Wygeneruj kolejny wariant z tym samym opisem">
+                                <span>Inny wariant</span>
+                            </button>
+                            <button class="btn-tool" id="btn-ai-download" title="Pobierz wygenerowaną grafikę w pełnej rozdzielczości do druku">
+                                <span>Pobierz plik</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Historia wygenerowanych grafik -->
+                    <div class="ai-history-section" id="ai-history-section" style="display: none;">
+                        <div class="ai-history-title">Ostatnie grafiki AI:</div>
+                        <div class="ai-history-grid" id="ai-history-container"></div>
                     </div>
                 </div>
 
@@ -744,6 +839,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=46"></script>
+    <script type="module" src="js/app.js?v=47"></script>
 </body>
 </html>

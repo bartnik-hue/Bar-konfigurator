@@ -7,6 +7,7 @@ import { BarBuilder } from './BarBuilder.js';
 import { BrandingManager } from './BrandingManager.js';
 import { LedManager } from './LedManager.js';
 import { CalibrationTool } from './CalibrationTool.js';
+import { AiTextureService, AI_STYLE_PRESETS } from './AiTextureService.js';
 
 class ArtbarApp {
     constructor() {
@@ -21,6 +22,7 @@ class ArtbarApp {
         this.barBuilder = new BarBuilder(this.scene, this.camera, this.renderer, this.registry, (stats) => this.updateUIStats(stats));
         this.brandingManager = new BrandingManager(this.barBuilder, this.registry);
         this.ledManager = new LedManager(this.barBuilder, this.registry);
+        this.aiTextureService = new AiTextureService();
 
         // Automatyczne nakładanie bieżącego brandingu, tła i LED na nowo dodawane moduły
         this.barBuilder.onModuleAdded = (moduleData) => {
@@ -969,6 +971,9 @@ class ArtbarApp {
             }
         };
 
+        // Inicjalizacja Generatora Tła AI (Stable Diffusion)
+        this.setupAiGenerator();
+
         // ==========================================
         // LOGOTYP / BRANDING NAKŁADKOWY
         // ==========================================
@@ -1493,6 +1498,203 @@ class ArtbarApp {
     hideRadialMenu() {
         const menu = document.getElementById('radial-action-menu');
         if (menu) menu.classList.remove('visible');
+    }
+
+    setupAiGenerator() {
+        const stylesContainer = document.getElementById('ai-styles-container');
+        const promptInput = document.getElementById('ai-prompt-input');
+        const btnGenerate = document.getElementById('btn-ai-generate');
+        const btnGenerateTxt = document.getElementById('ai-generate-btn-text');
+        const progressBox = document.getElementById('ai-progress-box');
+        const progressFill = document.getElementById('ai-progress-fill');
+        const progressStatus = document.getElementById('ai-progress-status');
+
+        const previewBox = document.getElementById('ai-preview-box');
+        const previewImg = document.getElementById('ai-preview-img');
+        const btnApply = document.getElementById('btn-ai-apply');
+        const btnReroll = document.getElementById('btn-ai-reroll');
+        const btnDownload = document.getElementById('btn-ai-download');
+
+        const historySection = document.getElementById('ai-history-section');
+        const historyContainer = document.getElementById('ai-history-container');
+
+        const btnToggleSettings = document.getElementById('btn-ai-toggle-settings');
+        const settingsPanel = document.getElementById('ai-settings-panel');
+        const selectProvider = document.getElementById('ai-select-provider');
+        const rowCloudKey = document.getElementById('ai-row-cloud-key');
+        const inputApiKey = document.getElementById('ai-input-api-key');
+        const rowLocalUrl = document.getElementById('ai-row-local-url');
+        const inputLocalUrl = document.getElementById('ai-input-local-url');
+        const toggleSeamless = document.getElementById('ai-toggle-seamless');
+        const selectAspect = document.getElementById('ai-select-aspect');
+
+        // Inicjalizacja pól ustawień z AiTextureService
+        if (selectProvider) {
+            selectProvider.value = this.aiTextureService.provider;
+            if (rowCloudKey) rowCloudKey.style.display = this.aiTextureService.provider === 'cloud' ? 'flex' : 'none';
+            if (rowLocalUrl) rowLocalUrl.style.display = this.aiTextureService.provider === 'local' ? 'flex' : 'none';
+        }
+        if (inputApiKey) inputApiKey.value = this.aiTextureService.stabilityApiKey;
+        if (inputLocalUrl) inputLocalUrl.value = this.aiTextureService.localWebUiUrl;
+        if (toggleSeamless) toggleSeamless.checked = this.aiTextureService.isSeamless;
+        if (selectAspect) selectAspect.value = this.aiTextureService.aspectRatio;
+
+        // Renderowanie kafelków stylów architektonicznych
+        if (stylesContainer) {
+            stylesContainer.innerHTML = '';
+            AI_STYLE_PRESETS.forEach(style => {
+                const card = document.createElement('div');
+                card.className = `ai-style-card ${style.id === this.aiTextureService.activeStyleId ? 'active' : ''}`;
+                card.dataset.styleId = style.id;
+                card.title = `${style.desc}`;
+                card.innerHTML = `
+                    <div class="ai-style-icon">${style.icon}</div>
+                    <div class="ai-style-name">${style.name}</div>
+                `;
+                card.addEventListener('click', () => {
+                    stylesContainer.querySelectorAll('.ai-style-card').forEach(c => c.classList.remove('active'));
+                    card.classList.add('active');
+                    this.aiTextureService.setStyle(style.id);
+                });
+                stylesContainer.appendChild(card);
+            });
+        }
+
+        // Przełączanie widoczności panelu ustawień silnika
+        btnToggleSettings?.addEventListener('click', () => {
+            const isOpen = settingsPanel.style.display === 'flex';
+            settingsPanel.style.display = isOpen ? 'none' : 'flex';
+            btnToggleSettings.classList.toggle('active', !isOpen);
+        });
+
+        // Zmiana dostawcy (Demo / Cloud / Local)
+        selectProvider?.addEventListener('change', (e) => {
+            const prov = e.target.value;
+            this.aiTextureService.setProvider(prov);
+            if (rowCloudKey) rowCloudKey.style.display = prov === 'cloud' ? 'flex' : 'none';
+            if (rowLocalUrl) rowLocalUrl.style.display = prov === 'local' ? 'flex' : 'none';
+            if (prov === 'cloud') {
+                this.showToast('Wybrano chmurę Stability AI (SDXL). Wprowadź klucz API.');
+            } else if (prov === 'local') {
+                this.showToast('Wybrano lokalne WebUI AUTOMATIC1111 (http://127.0.0.1:7860).');
+            } else {
+                this.showToast('Wybrano szybki tryb demonstracyjny (nie wymaga kluczy ani GPU).');
+            }
+        });
+
+        // Zapis klucza i adresu
+        inputApiKey?.addEventListener('input', (e) => {
+            this.aiTextureService.setApiKey(e.target.value);
+        });
+        inputLocalUrl?.addEventListener('input', (e) => {
+            this.aiTextureService.setLocalUrl(e.target.value);
+        });
+
+        // Bezszwowość i format
+        toggleSeamless?.addEventListener('change', (e) => {
+            this.aiTextureService.isSeamless = e.target.checked;
+        });
+        selectAspect?.addEventListener('change', (e) => {
+            this.aiTextureService.aspectRatio = e.target.value;
+        });
+
+        // Wskaźnik postępu
+        this.aiTextureService.onStatusUpdate = ({ message, percent }) => {
+            if (progressFill) progressFill.style.width = `${percent}%`;
+            if (progressStatus) progressStatus.textContent = message;
+        };
+
+        const renderHistory = () => {
+            if (!historyContainer || !historySection) return;
+            if (this.aiTextureService.history.length === 0) {
+                historySection.style.display = 'none';
+                return;
+            }
+            historySection.style.display = 'flex';
+            historyContainer.innerHTML = '';
+            this.aiTextureService.history.forEach((item, idx) => {
+                const hCard = document.createElement('div');
+                hCard.className = `ai-history-card ${idx === 0 ? 'active' : ''}`;
+                hCard.title = `${item.prompt} (${new Date(item.timestamp).toLocaleTimeString()})`;
+                hCard.innerHTML = `<img src="${item.dataUrl}" alt="Wariant AI ${idx + 1}">`;
+                hCard.addEventListener('click', () => {
+                    historyContainer.querySelectorAll('.ai-history-card').forEach(c => c.classList.remove('active'));
+                    hCard.classList.add('active');
+                    this.aiTextureService.currentResult = item;
+                    if (previewImg) previewImg.src = item.dataUrl;
+                    if (previewBox) previewBox.style.display = 'flex';
+                    this.brandingManager.applyAiTexture(item.dataUrl, item, () => {
+                        const toggle = document.getElementById('toggle-panorama-enable');
+                        if (toggle && !toggle.checked) toggle.checked = true;
+                        document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
+                        this.showToast('Zastosowano grafikę z historii na 3D.');
+                    });
+                });
+                historyContainer.appendChild(hCard);
+            });
+        };
+
+        const doGenerate = async () => {
+            if (this.aiTextureService.isGenerating) return;
+
+            const userText = promptInput?.value || '';
+            if (btnGenerate) btnGenerate.disabled = true;
+            if (btnGenerateTxt) btnGenerateTxt.textContent = 'Generowanie tła AI...';
+            if (progressBox) progressBox.style.display = 'flex';
+            if (progressFill) progressFill.style.width = '10%';
+
+            try {
+                const result = await this.aiTextureService.generateTexture(userText);
+
+                // Pokaż podgląd
+                if (previewBox) previewBox.style.display = 'flex';
+                if (previewImg) previewImg.src = result.dataUrl;
+
+                // Automatycznie zastosuj na bary 3D w scenie
+                this.brandingManager.applyAiTexture(result.dataUrl, result, () => {
+                    const toggle = document.getElementById('toggle-panorama-enable');
+                    if (toggle && !toggle.checked) toggle.checked = true;
+                    document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
+                });
+
+                renderHistory();
+                this.showToast('Tło AI zostało pomyślnie nałożone na bary 3D!');
+            } catch (err) {
+                console.error('Błąd generacji AI:', err);
+                this.showToast(`Błąd generacji AI: ${err.message}`);
+                alert(`Błąd generacji AI: ${err.message}`);
+            } finally {
+                if (btnGenerate) btnGenerate.disabled = false;
+                if (btnGenerateTxt) btnGenerateTxt.textContent = 'Generuj tło frontu AI';
+                setTimeout(() => {
+                    if (progressBox) progressBox.style.display = 'none';
+                }, 1200);
+            }
+        };
+
+        btnGenerate?.addEventListener('click', doGenerate);
+        btnReroll?.addEventListener('click', doGenerate);
+
+        btnApply?.addEventListener('click', () => {
+            const cur = this.aiTextureService.currentResult;
+            if (cur && cur.dataUrl) {
+                this.brandingManager.applyAiTexture(cur.dataUrl, cur, () => {
+                    const toggle = document.getElementById('toggle-panorama-enable');
+                    if (toggle && !toggle.checked) toggle.checked = true;
+                    document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
+                    this.showToast('Zastosowano grafikę AI na frontach baru.');
+                });
+            }
+        });
+
+        btnDownload?.addEventListener('click', () => {
+            const cur = this.aiTextureService.currentResult;
+            if (cur && cur.dataUrl) {
+                const timestamp = new Date().toISOString().slice(0, 10);
+                this.aiTextureService.downloadImage(cur.dataUrl, `artbar-tlo-ai-${cur.styleId}-${timestamp}.png`);
+                this.showToast('Pobieranie grafiki AI w wysokiej rozdzielczości...');
+            }
+        });
     }
 
     animate() {

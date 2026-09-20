@@ -20,8 +20,90 @@ const MIME_TYPES = {
     '.ico': 'image/x-icon'
 };
 
+const https = require('https');
+
 const server = http.createServer((req, res) => {
+    // CORS headers for all requests
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
     let reqPath = decodeURI(req.url.split('?')[0]);
+
+    // Endpoint informacyjny o dostępności API serwera
+    if (reqPath === '/api/ai-status' && req.method === 'GET') {
+        const hasKey = !!process.env.STABILITY_API_KEY;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', hasEnvKey: hasKey }));
+        return;
+    }
+
+    // Bezpieczne serwerowe proxy do Stability AI (jeśli podano klucz w env)
+    if (reqPath === '/api/generate-texture' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const payload = JSON.parse(body);
+                const apiKey = process.env.STABILITY_API_KEY || payload.apiKey;
+
+                if (!apiKey) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Brak klucza API po stronie serwera.' }));
+                    return;
+                }
+
+                const postData = JSON.stringify({
+                    text_prompts: payload.text_prompts,
+                    cfg_scale: payload.cfg_scale || 7.5,
+                    height: payload.height || 640,
+                    width: payload.width || 1536,
+                    samples: 1,
+                    steps: payload.steps || 30
+                });
+
+                const options = {
+                    hostname: 'api.stability.ai',
+                    path: '/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Length': Buffer.byteLength(postData)
+                    }
+                };
+
+                const apiReq = https.request(options, (apiRes) => {
+                    let apiBody = '';
+                    apiRes.on('data', d => { apiBody += d; });
+                    apiRes.on('end', () => {
+                        res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json' });
+                        res.end(apiBody);
+                    });
+                });
+
+                apiReq.on('error', (e) => {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: e.message }));
+                });
+
+                apiReq.write(postData);
+                apiReq.end();
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Nieprawidłowy format JSON.' }));
+            }
+        });
+        return;
+    }
+
     if (reqPath === '/') reqPath = '/index.html';
     
     const filePath = path.join(ROOT, reqPath);
