@@ -1547,30 +1547,62 @@ class ArtbarApp {
             if (rowLocalUrl) rowLocalUrl.style.display = prov === 'automatic1111' ? 'flex' : 'none';
         };
 
+        const statusBadge = document.getElementById('ai-comfy-status-badge');
+        const btnRefreshComfy = document.getElementById('ai-btn-refresh-comfy');
+
+        const updateComfyStatusUI = async () => {
+            if (statusBadge) {
+                statusBadge.className = 'ai-comfy-badge';
+                statusBadge.textContent = '🔄 Wykrywanie instancji ComfyUI...';
+            }
+            const info = await this.aiTextureService.checkComfyUiConnection();
+            if (info.ok) {
+                if (statusBadge) {
+                    statusBadge.className = 'ai-comfy-badge connected';
+                    const devName = info.devices?.[0]?.name ? info.devices[0].name.replace(/^cuda:\d+\s*/, '').split(':')[0].trim() : 'GPU';
+                    statusBadge.textContent = `🟢 Połączono: ${info.type} (port ${info.port}) • ${devName}`;
+                }
+                if (inputComfyUrl) inputComfyUrl.value = this.aiTextureService.comfyUiUrl;
+            } else {
+                if (statusBadge) {
+                    statusBadge.className = 'ai-comfy-badge disconnected';
+                    statusBadge.textContent = `🔴 ComfyUI nie odpowiada (sprawdź czy aplikacja jest włączona)`;
+                }
+            }
+            await loadComfyCheckpoints();
+        };
+
         const loadComfyCheckpoints = async () => {
             if (!selectComfyCkpt) return;
             selectComfyCkpt.innerHTML = '<option value="">(Wyszukiwanie modeli na ComfyUI...)</option>';
-            const ckpts = await this.aiTextureService.fetchComfyUiCheckpoints();
-            if (ckpts && ckpts.length > 0) {
+            const models = await this.aiTextureService.fetchComfyUiCheckpoints();
+            if (models && models.length > 0) {
                 selectComfyCkpt.innerHTML = '';
-                ckpts.forEach(name => {
+                models.forEach(item => {
+                    const name = typeof item === 'object' ? item.name : item;
+                    const label = typeof item === 'object' ? item.label : item;
                     const opt = document.createElement('option');
                     opt.value = name;
-                    opt.textContent = name;
+                    opt.textContent = label;
                     if (name === this.aiTextureService.comfyUiCheckpoint) opt.selected = true;
                     selectComfyCkpt.appendChild(opt);
                 });
             } else {
-                selectComfyCkpt.innerHTML = '<option value="">(Uruchom ComfyUI i kliknij Zębatkę ponownie)</option>';
+                selectComfyCkpt.innerHTML = '<option value="">(Brak modeli - umieść model w models/checkpoints)</option>';
             }
         };
+
+        btnRefreshComfy?.addEventListener('click', (e) => {
+            e.preventDefault();
+            updateComfyStatusUI();
+        });
 
         // Inicjalizacja pól ustawień z AiTextureService
         if (selectProvider) {
             selectProvider.value = this.aiTextureService.provider;
             updateProviderRows(this.aiTextureService.provider);
             if (this.aiTextureService.provider === 'comfyui') {
-                loadComfyCheckpoints();
+                updateComfyStatusUI();
             }
         }
         if (inputComfyUrl) inputComfyUrl.value = this.aiTextureService.comfyUiUrl;
@@ -1606,7 +1638,7 @@ class ArtbarApp {
             settingsPanel.style.display = isOpen ? 'none' : 'flex';
             btnToggleSettings.classList.toggle('active', !isOpen);
             if (!isOpen && this.aiTextureService.provider === 'comfyui') {
-                loadComfyCheckpoints();
+                updateComfyStatusUI();
             }
         });
 
@@ -1617,8 +1649,8 @@ class ArtbarApp {
             updateProviderRows(prov);
 
             if (prov === 'comfyui') {
-                loadComfyCheckpoints();
-                this.showToast('Wybrano lokalne ComfyUI (GPU - http://127.0.0.1:8188).');
+                updateComfyStatusUI();
+                this.showToast('Wybrano lokalne ComfyUI (GPU).');
             } else if (prov === 'cloud') {
                 this.showToast('Wybrano chmurę Stability AI (SDXL). Wprowadź klucz API.');
             } else if (prov === 'automatic1111') {

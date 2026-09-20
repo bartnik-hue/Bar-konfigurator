@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Artbar Solutions - Konfigurator Barów Eventowych 3D</title>
-    <link rel="stylesheet" href="css/style.css?v=47">
+    <link rel="stylesheet" href="css/style.css?v=49">
     <!-- Google Fonts: Montserrat & Cinzel dla luksusowego wyglądu -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -320,19 +320,23 @@
                         <div class="ai-setting-row">
                             <label class="ai-setting-label">Źródło AI:</label>
                             <select id="ai-select-provider" class="scene-select">
-                                <option value="comfyui">Lokalne ComfyUI (GPU - http://127.0.0.1:8188)</option>
+                                <option value="comfyui">Lokalne ComfyUI (GPU - Comfy Desktop / Standalone)</option>
                                 <option value="cloud">Stability AI Chmura (SDXL / SD 3.5)</option>
                                 <option value="automatic1111">Lokalny AUTOMATIC1111 (http://127.0.0.1:7860)</option>
                                 <option value="demo">Szybki Tryb Demo (bez kluczy)</option>
                             </select>
                         </div>
                         <div class="ai-setting-row" id="ai-row-comfy-url">
-                            <label class="ai-setting-label">Adres ComfyUI:</label>
-                            <input type="text" id="ai-input-comfy-url" value="http://127.0.0.1:8188" class="ai-input-text">
-                            <span class="ai-hint-small">Uruchom ComfyUI z flagą --listen 127.0.0.1 --port 8188</span>
+                            <div class="ai-setting-label-row">
+                                <label class="ai-setting-label">Adres ComfyUI:</label>
+                                <button type="button" id="ai-btn-refresh-comfy" class="ai-btn-link-sm" title="Ponownie sprawdź połączenie i modele">🔄 Sprawdź</button>
+                            </div>
+                            <input type="text" id="ai-input-comfy-url" value="http://127.0.0.1:8000" class="ai-input-text">
+                            <div class="ai-comfy-badge" id="ai-comfy-status-badge">🔄 Sprawdzanie połączenia...</div>
+                            <span class="ai-hint-small">Comfy Desktop domyślnie używa portu 8000, wersja Standalone 8188. Port jest wykrywany automatycznie.</span>
                         </div>
                         <div class="ai-setting-row" id="ai-row-comfy-ckpt">
-                            <label class="ai-setting-label">Model Checkpoint ComfyUI:</label>
+                            <label class="ai-setting-label">Model Checkpoint / Diffusion:</label>
                             <select id="ai-select-comfy-ckpt" class="scene-select">
                                 <option value="">(Wykrywanie zainstalowanych modeli...)</option>
                             </select>
@@ -854,6 +858,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=47"></script>
+    <script type="module" src="js/app.js?v=49"></script>
 </body>
 </html>

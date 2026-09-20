@@ -76,7 +76,11 @@ export class AiTextureService {
     constructor() {
         this.provider = localStorage.getItem('artbar_ai_provider') || 'comfyui'; // 'comfyui' | 'cloud' | 'automatic1111' | 'demo'
         this.stabilityApiKey = localStorage.getItem('artbar_stability_key') || '';
-        this.comfyUiUrl = localStorage.getItem('artbar_comfyui_url') || 'http://127.0.0.1:8188';
+        const savedComfyUrl = localStorage.getItem('artbar_comfyui_url');
+        // Jeśli użytkownik miał zapisane 8188 (stary default), zmień na 8000 (Comfy Desktop)
+        this.comfyUiUrl = (savedComfyUrl && !savedComfyUrl.includes('8188')) ? savedComfyUrl : 'http://127.0.0.1:8000';
+        this.comfyUiPort = 8000;
+        this.comfyUiInfo = null;
         this.comfyUiCheckpoint = localStorage.getItem('artbar_comfyui_ckpt') || '';
         this.localWebUiUrl = localStorage.getItem('artbar_local_sd_url') || 'http://127.0.0.1:7860';
         
@@ -105,8 +109,12 @@ export class AiTextureService {
     }
 
     setComfyUiUrl(url) {
-        this.comfyUiUrl = (url || '').trim() || 'http://127.0.0.1:8188';
+        this.comfyUiUrl = (url || '').trim() || 'http://127.0.0.1:8000';
         localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
+        try {
+            const u = new URL(this.comfyUiUrl);
+            if (u.port) this.comfyUiPort = parseInt(u.port, 10);
+        } catch(e) {}
     }
 
     setComfyUiCheckpoint(ckpt) {
@@ -164,31 +172,103 @@ export class AiTextureService {
     }
 
     /**
-     * Sprawdza dostępność ComfyUI i pobiera listę zainstalowanych modeli checkpoint
+     * Sprawdza stan połączenia z ComfyUI i automatycznie wykrywa port (8000 dla Comfy Desktop lub 8188 dla Standalone)
+     */
+    async checkComfyUiConnection() {
+        // 1. Sprawdź autowykrywanie przez serwer konfiguratora
+        try {
+            const res = await fetch('/api/comfy-detect', { method: 'GET', headers: { 'Accept': 'application/json' } });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.active) {
+                    this.comfyUiPort = data.port || 8000;
+                    this.comfyUiUrl = `http://127.0.0.1:${this.comfyUiPort}`;
+                    localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
+                    this.comfyUiInfo = data;
+                    return { ok: true, ...data };
+                }
+            }
+        } catch (e) {}
+
+        // 2. Bezpośrednie testowanie portów (np. gdy konfigurator działa bez Node proxy)
+        const ports = [8000, 8188];
+        for (const p of ports) {
+            try {
+                const res = await fetch(`http://127.0.0.1:${p}/system_stats`, { method: 'GET' });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.comfyUiPort = p;
+                    this.comfyUiUrl = `http://127.0.0.1:${p}`;
+                    localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
+                    this.comfyUiInfo = {
+                        active: true,
+                        port: p,
+                        type: p === 8000 ? 'Comfy Desktop' : 'ComfyUI Standalone',
+                        version: data.system?.comfyui_version || 'unknown',
+                        devices: data.devices || []
+                    };
+                    return { ok: true, ...this.comfyUiInfo };
+                }
+            } catch (e) {}
+        }
+
+        return { ok: false, error: 'ComfyUI nie odpowiada na portach 8000 ani 8188. Uruchom aplikację ComfyUI.' };
+    }
+
+    /**
+     * Sprawdza dostępność ComfyUI i pobiera listę zainstalowanych modeli checkpoint i UNET
      */
     async fetchComfyUiCheckpoints() {
-        // Próba przez lokalne proxy serwera lub bezpośrednio
-        const endpoints = [
+        await this.checkComfyUiConnection();
+        const portHeader = { 'x-comfy-port': String(this.comfyUiPort || 8000) };
+        const collectedModels = [];
+
+        // 1. Pobierz modele CheckpointLoaderSimple
+        const ckptEndpoints = [
             '/api/comfyui/object_info/CheckpointLoaderSimple',
             `${this.comfyUiUrl.replace(/\/+$/, '')}/object_info/CheckpointLoaderSimple`
         ];
-
-        for (const ep of endpoints) {
+        for (const ep of ckptEndpoints) {
             try {
-                const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json' } });
+                const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json', ...portHeader } });
                 if (res.ok) {
                     const data = await res.json();
                     const ckpts = data?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0];
-                    if (Array.isArray(ckpts) && ckpts.length > 0) {
-                        this.cachedCheckpoints = ckpts;
-                        if (!this.comfyUiCheckpoint || !ckpts.includes(this.comfyUiCheckpoint)) {
-                            this.setComfyUiCheckpoint(ckpts[0]);
-                        }
-                        return ckpts;
+                    if (Array.isArray(ckpts)) {
+                        ckpts.forEach(c => collectedModels.push({ name: c, type: 'checkpoint', label: `[Checkpoint] ${c}` }));
+                        break;
                     }
                 }
-            } catch (e) {
-                // ignoruj błąd endpointa i sprawdź następny
+            } catch (e) {}
+        }
+
+        // 2. Pobierz modele UNET / Diffusion
+        const unetEndpoints = [
+            '/api/comfyui/object_info/UNETLoader',
+            `${this.comfyUiUrl.replace(/\/+$/, '')}/object_info/UNETLoader`
+        ];
+        for (const ep of unetEndpoints) {
+            try {
+                const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json', ...portHeader } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const unets = data?.UNETLoader?.input?.required?.unet_name?.[0];
+                    if (Array.isArray(unets)) {
+                        unets.forEach(u => {
+                            if (!collectedModels.some(m => m.name === u)) {
+                                collectedModels.push({ name: u, type: 'unet', label: `[Diffusion/UNET] ${u}` });
+                            }
+                        });
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (collectedModels.length > 0) {
+            this.cachedCheckpoints = collectedModels;
+            if (!this.comfyUiCheckpoint || !collectedModels.some(m => m.name === this.comfyUiCheckpoint)) {
+                this.setComfyUiCheckpoint(collectedModels[0].name);
             }
         }
         return this.cachedCheckpoints;
@@ -252,15 +332,17 @@ export class AiTextureService {
     async generateComfyUi(positivePrompt, negativePrompt, dims) {
         this.notifyStatus(`Sprawdzanie połączenia z ComfyUI...`, 20);
 
-        // Pobierz aktualną listę modeli jeśli jeszcze nie pobrano
+        // Upewnij się, że znamy właściwy port i modele
         let ckpts = this.cachedCheckpoints;
         if (!ckpts || ckpts.length === 0) {
             ckpts = await this.fetchComfyUiCheckpoints();
         }
 
-        const ckptName = this.comfyUiCheckpoint || (ckpts.length > 0 ? ckpts[0] : 'v1-5-pruned-emaonly.safetensors');
+        const selectedObj = this.cachedCheckpoints.find(c => (typeof c === 'object' ? c.name : c) === this.comfyUiCheckpoint) || this.cachedCheckpoints[0];
+        const ckptName = typeof selectedObj === 'object' ? selectedObj.name : (selectedObj || 'v1-5-pruned-emaonly.safetensors');
         const seed = Math.floor(Math.random() * 1000000000000);
         const clientId = 'artbar_' + Date.now();
+        const activePort = String(this.comfyUiPort || 8000);
 
         // Standardowy graf Text-To-Image dla ComfyUI
         const promptGraph = {
@@ -339,7 +421,7 @@ export class AiTextureService {
                 this.notifyStatus('Wysyłanie zadania do ComfyUI...', 35);
                 const res = await fetch(url, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-comfy-port': activePort },
                     body: postBody
                 });
 
@@ -369,23 +451,41 @@ export class AiTextureService {
             attempt++;
             
             const progressPct = Math.min(90, 50 + Math.round((attempt / 40) * 40));
-            this.notifyStatus(`Generowanie na karcie GPU w toku (${attempt * 0.6}s)...`, progressPct);
+            this.notifyStatus(`Generowanie na karcie GPU w toku (${(attempt * 0.6).toFixed(1)}s)...`, progressPct);
 
             try {
                 const historyUrl = `${activePrefix}/history/${promptId}`;
-                const hRes = await fetch(historyUrl);
+                const hRes = await fetch(historyUrl, { headers: { 'x-comfy-port': activePort } });
                 if (hRes.ok) {
                     const hData = await hRes.json();
-                    if (hData && hData[promptId] && hData[promptId].outputs) {
-                        const outputs = hData[promptId].outputs;
-                        // Szukamy węzła SaveImage (id "9")
-                        if (outputs["9"] && outputs["9"].images && outputs["9"].images.length > 0) {
-                            outputImageInfo = outputs["9"].images[0];
-                            break;
+                    if (hData && hData[promptId]) {
+                        const entry = hData[promptId];
+                        
+                        // Wykryj natychmiast błędy wykonania w ComfyUI
+                        if (entry.status?.status_str === 'error') {
+                            const errItem = entry.status?.messages?.find(m => m[0] === 'execution_error');
+                            let errorDetail = errItem ? (errItem[1]?.exception_message || errItem[1]?.node_type) : 'Błąd wykonania w ComfyUI';
+                            if (errorDetail.includes('clip input is invalid') || errorDetail.includes('CLIP')) {
+                                errorDetail += '\n\nModel "' + ckptName + '" nie zawiera wbudowanego encodera CLIP (np. model wideo LTX lub architektura bez wag tekstowych). Dla generowania frontów barowych umieść model SDXL lub SD 1.5 (np. sd_xl_base_1.0.safetensors) w folderze models/checkpoints/.';
+                            }
+                            throw new Error(`ComfyUI: ${errorDetail}`);
+                        }
+
+                        if (entry.outputs) {
+                            const outputs = entry.outputs;
+                            // Szukamy węzła SaveImage (id "9")
+                            if (outputs["9"] && outputs["9"].images && outputs["9"].images.length > 0) {
+                                outputImageInfo = outputs["9"].images[0];
+                                break;
+                            }
                         }
                     }
                 }
-            } catch (pollErr) {}
+            } catch (pollErr) {
+                if (pollErr.message && pollErr.message.startsWith('ComfyUI:')) {
+                    throw pollErr;
+                }
+            }
         }
 
         if (!outputImageInfo) {
@@ -394,9 +494,9 @@ export class AiTextureService {
 
         // Pobranie wygenerowanego pliku
         this.notifyStatus('Pobieranie gotowego obrazu z ComfyUI...', 92);
-        const viewUrl = `${activePrefix}/view?filename=${encodeURIComponent(outputImageInfo.filename)}&subfolder=${encodeURIComponent(outputImageInfo.subfolder || '')}&type=${encodeURIComponent(outputImageInfo.type || 'output')}`;
+        const viewUrl = `${activePrefix}/view?filename=${encodeURIComponent(outputImageInfo.filename)}&subfolder=${encodeURIComponent(outputImageInfo.subfolder || '')}&type=${encodeURIComponent(outputImageInfo.type || 'output')}&comfyPort=${activePort}`;
         
-        const imgRes = await fetch(viewUrl);
+        const imgRes = await fetch(viewUrl, { headers: { 'x-comfy-port': activePort } });
         if (!imgRes.ok) {
             throw new Error(`ComfyUI: błąd pobierania obrazu (${imgRes.status}).`);
         }

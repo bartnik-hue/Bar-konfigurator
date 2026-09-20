@@ -104,20 +104,65 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Transparentne proxy dla lokalnego ComfyUI (http://127.0.0.1:8188) bez problemów z CORS
+    // Endpoint automatycznego wykrywania aktywnej instancji ComfyUI (Desktop na 8000 vs Standalone na 8188)
+    if (reqPath === '/api/comfy-detect' && req.method === 'GET') {
+        const portsToTest = [8000, 8188];
+        const checkPort = (port) => {
+            return new Promise((resolve) => {
+                const testReq = http.get(`http://127.0.0.1:${port}/system_stats`, { timeout: 1500 }, (testRes) => {
+                    let data = '';
+                    testRes.on('data', c => data += c);
+                    testRes.on('end', () => {
+                        try {
+                            const parsed = JSON.parse(data);
+                            resolve({
+                                active: true,
+                                port: port,
+                                type: port === 8000 ? 'Comfy Desktop' : 'ComfyUI Standalone',
+                                version: parsed.system?.comfyui_version || 'unknown',
+                                devices: parsed.devices || []
+                            });
+                        } catch(e) {
+                            resolve(null);
+                        }
+                    });
+                });
+                testReq.on('error', () => resolve(null));
+                testReq.on('timeout', () => { testReq.destroy(); resolve(null); });
+            });
+        };
+
+        (async () => {
+            for (const p of portsToTest) {
+                const info = await checkPort(p);
+                if (info) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(info));
+                    return;
+                }
+            }
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ active: false, error: 'Żadna instancja ComfyUI nie została wykryta na portach 8000 ani 8188.' }));
+        })();
+        return;
+    }
+
+    // Transparentne proxy dla lokalnego ComfyUI (domyślnie port 8000 dla Comfy Desktop lub 8188 dla standalone)
     if (reqPath.startsWith('/api/comfyui/')) {
         const subPath = req.url.replace(/^\/api\/comfyui\//, '');
-        const targetUrl = new URL(`http://127.0.0.1:8188/${subPath}`);
+        const urlObj = new URL(`http://localhost${req.url}`);
+        const portParam = req.headers['x-comfy-port'] || urlObj.searchParams.get('comfyPort') || '8000';
+        const targetUrl = new URL(`http://127.0.0.1:${portParam}/${subPath}`);
+
+        const forwardHeaders = { ...req.headers, host: `127.0.0.1:${portParam}` };
+        delete forwardHeaders['x-comfy-port'];
 
         const proxyReq = http.request({
             hostname: targetUrl.hostname,
             port: targetUrl.port,
             path: targetUrl.pathname + targetUrl.search,
             method: req.method,
-            headers: {
-                ...req.headers,
-                host: `${targetUrl.hostname}:${targetUrl.port}`
-            }
+            headers: forwardHeaders
         }, (proxyRes) => {
             res.writeHead(proxyRes.statusCode, proxyRes.headers);
             proxyRes.pipe(res);
