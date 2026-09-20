@@ -105,13 +105,21 @@ export class ModelRegistry {
 
     loadPlaceholderTexture() {
         const texLoader = new THREE.TextureLoader();
-        texLoader.load('wzor/dlugi alpha0001.png', (tex) => {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            this.placeholderLogoTexture = tex;
-            if (!this.activeLogoTexture) {
-                this.updateAllLogoPlanes(tex);
+        texLoader.load(
+            'wzor/dlugi alpha0001.png',
+            (tex) => {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                this.placeholderLogoTexture = tex;
+                if (!this.activeLogoTexture) {
+                    this.updateAllLogoPlanes(tex);
+                }
+            },
+            undefined,
+            () => {
+                // Folder wzor nie istnieje w repozytorium - brak domyślnego logo (użytkownik wgrywa własne)
+                this.placeholderLogoTexture = null;
             }
-        });
+        );
     }
 
     loadCalibration() {
