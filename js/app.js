@@ -263,8 +263,17 @@ class ArtbarApp {
                 this.barBuilder.deselectModule();
                 this.hideContextMenu();
                 this.hideRadialMenu();
+            } else if ((e.key === 'k' || e.key === 'K') && (e.altKey || e.ctrlKey)) {
+                // Ukryty skrót administratorski do kalibracji offsetów (Alt+K / Ctrl+K)
+                e.preventDefault();
+                document.getElementById('btn-open-calib')?.click();
             }
         });
+
+        // Globalny dostęp do otwarcia kalibracji z konsoli w razie potrzeby
+        window.toggleCalibration = () => {
+            document.getElementById('btn-open-calib')?.click();
+        };
 
         // Bezpieczne zamykanie menu przy kliknięciu poza menu (nie zamyka przy otwieraniu!)
         window.addEventListener('pointerdown', (e) => {
