@@ -422,6 +422,15 @@ export class ModelRegistry {
     setupShadowsAndMaterials(root, modelKey) {
         root.traverse(child => {
             if (child.isMesh) {
+                // Całkowicie wyklucz zduplikowaną w Blenderze planszę PLANSZA.001 (BarArt.001) z pliku BarModel.glb.
+                // PLANSZA.001 nakłada się w 100% na planszę właściwą PLANSZA.004 (BarArt.104), wywołując Z-fighting i gwałtowne drganie tekstur.
+                if (child.name === 'BarArt.001' || (child.parent && child.parent.name === 'PLANSZA.001')) {
+                    child.visible = false;
+                    child.castShadow = false;
+                    child.receiveShadow = false;
+                    return;
+                }
+
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -453,8 +462,9 @@ export class ModelRegistry {
                     const origMat = mats[0];
                     const frontMat = origMat.clone();
                     frontMat.name = 'front';
-                    frontMat.side = THREE.DoubleSide;
+                    frontMat.side = THREE.FrontSide;
                     origMat.name = 'frame';
+                    origMat.side = THREE.FrontSide;
 
                     // W siatce BarArt.104 z 36 indeksami (12 trójkątów z Blender):
                     // Pierwsze 6 indeksów (2 trójkąty) to dokładnie lico frontu (Z=0.024m), a pozostałe 30 to krawędzie i tył
@@ -511,9 +521,8 @@ export class ModelRegistry {
                 if (child.material) {
                     const mats = Array.isArray(child.material) ? child.material : [child.material];
                     mats.forEach(m => {
-                        m.side = THREE.DoubleSide;
                         if (m.map) {
-                            m.map.anisotropy = 8;
+                            m.map.anisotropy = 16;
                         }
                     });
                 }
