@@ -265,8 +265,14 @@ export class AiTextureService {
 
         if (collectedModels.length > 0) {
             this.cachedCheckpoints = collectedModels;
-            if (!this.comfyUiCheckpoint || !collectedModels.some(m => m.name === this.comfyUiCheckpoint)) {
-                this.setComfyUiCheckpoint(collectedModels[0].name);
+            
+            // Preferuj model Z-Image Turbo / Krea / Flux jeśli zainstalowany na maszynie użytkownika
+            const preferred = collectedModels.find(m => m.name.includes('z_image') || m.name.includes('krea') || m.name.includes('turbo'))
+                           || collectedModels.find(m => m.type === 'checkpoint' && !m.name.includes('ltx'))
+                           || collectedModels[0];
+
+            if (!this.comfyUiCheckpoint || !collectedModels.some(m => m.name === this.comfyUiCheckpoint) || this.comfyUiCheckpoint.includes('v1-5-pruned') || this.comfyUiCheckpoint.includes('ltx')) {
+                this.setComfyUiCheckpoint(preferred.name);
             }
         }
         return this.cachedCheckpoints;
@@ -325,7 +331,7 @@ export class AiTextureService {
     }
 
     /**
-     * Generacja poprzez lokalne API ComfyUI (http://127.0.0.1:8188)
+     * Generacja poprzez lokalne API ComfyUI (http://127.0.0.1:8000)
      */
     async generateComfyUi(positivePrompt, negativePrompt, dims) {
         this.notifyStatus(`Sprawdzanie połączenia z ComfyUI...`, 20);
@@ -337,71 +343,165 @@ export class AiTextureService {
         }
 
         const selectedObj = this.cachedCheckpoints.find(c => (typeof c === 'object' ? c.name : c) === this.comfyUiCheckpoint) || this.cachedCheckpoints[0];
-        const ckptName = typeof selectedObj === 'object' ? selectedObj.name : (selectedObj || 'v1-5-pruned-emaonly.safetensors');
+        const ckptName = typeof selectedObj === 'object' ? selectedObj.name : (selectedObj || 'z_image_turbo_bf16.safetensors');
         const seed = Math.floor(Math.random() * 1000000000000);
         const clientId = 'artbar_' + Date.now();
         const activePort = String(this.comfyUiPort || 8000);
 
-        // Standardowy graf Text-To-Image dla ComfyUI
-        const promptGraph = {
-            "3": {
-                "inputs": {
-                    "seed": seed,
-                    "steps": 25,
-                    "cfg": 7.0,
-                    "sampler_name": "euler_ancestral",
-                    "scheduler": "karras",
-                    "denoise": 1.0,
-                    "model": ["4", 0],
-                    "positive": ["6", 0],
-                    "negative": ["7", 0],
-                    "latent_image": ["5", 0]
+        const isUnet = (selectedObj && selectedObj.type === 'unet') ||
+                       ckptName.includes('z_image') ||
+                       ckptName.includes('turbo') ||
+                       ckptName.includes('flux') ||
+                       ckptName.includes('krea') ||
+                       ckptName.includes('diffusion');
+
+        let promptGraph = null;
+
+        if (isUnet) {
+            // Natywny graf Z-Image Turbo / Lumina 2 Flow Diffusion (8 kroków, ultra-szybka generacja na RTX 4070 Ti)
+            promptGraph = {
+                "unet": {
+                    "inputs": {
+                        "unet_name": ckptName,
+                        "weight_dtype": "default"
+                    },
+                    "class_type": "UNETLoader"
                 },
-                "class_type": "KSampler"
-            },
-            "4": {
-                "inputs": {
-                    "ckpt_name": ckptName
+                "clip": {
+                    "inputs": {
+                        "clip_name": "qwen_3_4b.safetensors",
+                        "type": "lumina2",
+                        "device": "default"
+                    },
+                    "class_type": "CLIPLoader"
                 },
-                "class_type": "CheckpointLoaderSimple"
-            },
-            "5": {
-                "inputs": {
-                    "width": dims.width,
-                    "height": dims.height,
-                    "batch_size": 1
+                "vae": {
+                    "inputs": {
+                        "vae_name": "ae.safetensors"
+                    },
+                    "class_type": "VAELoader"
                 },
-                "class_type": "EmptyLatentImage"
-            },
-            "6": {
-                "inputs": {
-                    "text": positivePrompt,
-                    "clip": ["4", 1]
+                "sampling": {
+                    "inputs": {
+                        "shift": 3.0,
+                        "sampling": "flow",
+                        "model": ["unet", 0]
+                    },
+                    "class_type": "ModelSamplingAuraFlow"
                 },
-                "class_type": "CLIPTextEncode"
-            },
-            "7": {
-                "inputs": {
-                    "text": negativePrompt,
-                    "clip": ["4", 1]
+                "latent": {
+                    "inputs": {
+                        "width": dims.width,
+                        "height": dims.height,
+                        "batch_size": 1
+                    },
+                    "class_type": "EmptySD3LatentImage"
                 },
-                "class_type": "CLIPTextEncode"
-            },
-            "8": {
-                "inputs": {
-                    "samples": ["3", 0],
-                    "vae": ["4", 2]
+                "pos": {
+                    "inputs": {
+                        "text": positivePrompt,
+                        "clip": ["clip", 0]
+                    },
+                    "class_type": "CLIPTextEncode"
                 },
-                "class_type": "VAEDecode"
-            },
-            "9": {
-                "inputs": {
-                    "filename_prefix": "Artbar_Front",
-                    "images": ["8", 0]
+                "neg": {
+                    "inputs": {
+                        "conditioning": ["pos", 0]
+                    },
+                    "class_type": "ConditioningZeroOut"
                 },
-                "class_type": "SaveImage"
-            }
-        };
+                "sampler": {
+                    "inputs": {
+                        "seed": seed,
+                        "steps": 8,
+                        "cfg": 1.0,
+                        "sampler_name": "res_multistep",
+                        "scheduler": "simple",
+                        "denoise": 1.0,
+                        "model": ["sampling", 0],
+                        "positive": ["pos", 0],
+                        "negative": ["neg", 0],
+                        "latent_image": ["latent", 0]
+                    },
+                    "class_type": "KSampler"
+                },
+                "decode": {
+                    "inputs": {
+                        "samples": ["sampler", 0],
+                        "vae": ["vae", 0]
+                    },
+                    "class_type": "VAEDecode"
+                },
+                "save": {
+                    "inputs": {
+                        "filename_prefix": "Artbar_Front",
+                        "images": ["decode", 0]
+                    },
+                    "class_type": "SaveImage"
+                }
+            };
+        } else {
+            // Standardowy graf Checkpoint (SDXL / SD 1.5 z CheckpointLoaderSimple)
+            promptGraph = {
+                "3": {
+                    "inputs": {
+                        "seed": seed,
+                        "steps": 25,
+                        "cfg": 7.0,
+                        "sampler_name": "euler_ancestral",
+                        "scheduler": "karras",
+                        "denoise": 1.0,
+                        "model": ["4", 0],
+                        "positive": ["6", 0],
+                        "negative": ["7", 0],
+                        "latent_image": ["5", 0]
+                    },
+                    "class_type": "KSampler"
+                },
+                "4": {
+                    "inputs": {
+                        "ckpt_name": ckptName
+                    },
+                    "class_type": "CheckpointLoaderSimple"
+                },
+                "5": {
+                    "inputs": {
+                        "width": dims.width,
+                        "height": dims.height,
+                        "batch_size": 1
+                    },
+                    "class_type": "EmptyLatentImage"
+                },
+                "6": {
+                    "inputs": {
+                        "text": positivePrompt,
+                        "clip": ["4", 1]
+                    },
+                    "class_type": "CLIPTextEncode"
+                },
+                "7": {
+                    "inputs": {
+                        "text": negativePrompt,
+                        "clip": ["4", 1]
+                    },
+                    "class_type": "CLIPTextEncode"
+                },
+                "8": {
+                    "inputs": {
+                        "samples": ["3", 0],
+                        "vae": ["4", 2]
+                    },
+                    "class_type": "VAEDecode"
+                },
+                "9": {
+                    "inputs": {
+                        "filename_prefix": "Artbar_Front",
+                        "images": ["8", 0]
+                    },
+                    "class_type": "SaveImage"
+                }
+            };
+        }
 
         const postBody = JSON.stringify({ prompt: promptGraph, client_id: clientId });
 
@@ -471,18 +571,21 @@ export class AiTextureService {
                             const errItem = entry.status?.messages?.find(m => m[0] === 'execution_error');
                             let errorDetail = errItem ? (errItem[1]?.exception_message || errItem[1]?.node_type) : 'Błąd wykonania w ComfyUI';
                             if (errorDetail.includes('clip input is invalid') || errorDetail.includes('CLIP')) {
-                                errorDetail += '\n\nModel "' + ckptName + '" nie zawiera wbudowanego encodera CLIP (np. model wideo LTX lub architektura bez wag tekstowych). Dla generowania frontów barowych umieść model SDXL lub SD 1.5 (np. sd_xl_base_1.0.safetensors) w folderze models/checkpoints/.';
+                                errorDetail += '\n\nModel "' + ckptName + '" nie zawiera wbudowanego encodera CLIP (np. model wideo LTX). Zalecany jest zainstalowany model z_image_turbo_bf16.safetensors.';
                             }
                             throw new Error(`ComfyUI: ${errorDetail}`);
                         }
 
                         if (entry.outputs) {
                             const outputs = entry.outputs;
-                            // Szukamy węzła SaveImage (id "9")
-                            if (outputs["9"] && outputs["9"].images && outputs["9"].images.length > 0) {
-                                outputImageInfo = outputs["9"].images[0];
-                                break;
+                            // Znajdź dowolny węzeł SaveImage, który ma wygenerowane obrazy
+                            for (const nodeId of Object.keys(outputs)) {
+                                if (outputs[nodeId].images && outputs[nodeId].images.length > 0) {
+                                    outputImageInfo = outputs[nodeId].images[0];
+                                    break;
+                                }
                             }
+                            if (outputImageInfo) break;
                         }
                     }
                 }
