@@ -1298,79 +1298,17 @@ body, html {
    RESPONSIVE DESIGN (TABLETS & SMARTPHONES)
    ========================================================================== */
 
-/* 1. TABLETY / LAPTOPY (Szerokość <= 1024px) */
+/* ==========================================================================
+   RESPONSYWNOŚĆ (MOBILE, TABLETY, SMARTFONY)
+   ========================================================================== */
+
+/* 1. TABLETY / MAŁE LAPTOPY (Szerokość <= 1024px) */
 @media (max-width: 1024px) {
     .top-header {
-        top: 14px;
-        left: 16px;
-        padding: 8px 16px;
-    }
-
-    .brand-title {
-        font-size: 1.0rem;
-        letter-spacing: 1.5px;
-    }
-
-    .brand-subtitle {
-        font-size: 0.60rem;
-    }
-
-    .stats-bar {
-        display: none;
-    }
-
-    .header-divider {
-        display: none;
-    }
-
-    .top-actions {
-        top: 12px;
-        right: 14px;
-        gap: 6px;
-    }
-
-    .top-actions .btn-tool {
-        min-width: 66px;
-        min-height: 64px;
-        padding: 6px 8px;
-        font-size: 0.68rem;
-    }
-
-    .top-actions .btn-tool svg {
-        width: 22px;
-        height: 22px;
-    }
-
-    .bottom-controls {
-        bottom: 18px;
-        max-width: 96vw;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding: 7px 12px;
-    }
-
-    .bottom-controls::-webkit-scrollbar {
-        display: none;
-    }
-
-    .side-panel {
-        top: 86px;
-        right: 16px;
-        width: 320px;
-        max-height: calc(100vh - 110px);
-    }
-}
-
-/* 2. SMARTFONY I TABLETY PIONOWE (Szerokość <= 768px) */
-@media (max-width: 768px) {
-    /* Nagłówek ARTBAR */
-    .top-header {
         top: 10px;
-        left: 10px;
-        padding: 6px 12px;
+        left: 12px;
+        padding: 6px 14px;
         border-radius: var(--radius-sm);
-        gap: 8px;
     }
 
     .brand-title {
@@ -1380,23 +1318,23 @@ body, html {
 
     .brand-subtitle {
         font-size: 0.58rem;
-        letter-spacing: 0.8px;
     }
 
-    /* Pasek narzędzi u góry: pozioma, przesuwalna wstęga (Swipeable dock) */
+    .stats-bar, .header-divider {
+        display: none;
+    }
+
     .top-actions {
-        top: 56px;
-        left: 10px;
-        right: 10px;
-        max-width: calc(100vw - 20px);
+        top: 10px;
+        right: 12px;
+        left: auto;
+        max-width: calc(100vw - 170px);
+        gap: 6px;
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
-        padding: 4px 2px 8px 2px;
-        gap: 6px;
-        align-items: center;
-        justify-content: flex-start;
+        padding: 2px 0;
     }
 
     .top-actions::-webkit-scrollbar {
@@ -1404,83 +1342,207 @@ body, html {
     }
 
     .top-actions .btn-tool {
+        flex-direction: row;
+        align-items: center;
+        min-width: auto;
+        min-height: 36px;
+        height: 36px;
+        padding: 4px 10px;
+        font-size: 0.70rem;
+        gap: 6px;
         flex-shrink: 0;
-        min-width: 58px;
-        min-height: 52px;
-        padding: 5px 6px;
-        font-size: 0.64rem;
-        line-height: 1.15;
-        border-radius: 8px;
-        gap: 3px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        white-space: nowrap;
     }
 
     .top-actions .btn-tool svg {
-        width: 19px;
-        height: 19px;
-        margin-bottom: 2px;
+        width: 18px;
+        height: 18px;
+        margin-bottom: 0;
     }
 
-    /* Dolny pasek modułów i widoków: przesuwalny dock */
     .bottom-controls {
         bottom: 12px;
-        left: 10px;
-        right: 10px;
-        width: auto;
-        max-width: calc(100vw - 20px);
-        transform: none;
+        max-width: calc(100vw - 24px);
         overflow-x: auto;
-        overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
-        padding: 6px 10px;
+        padding: 5px 10px;
         gap: 6px;
-        border-radius: 28px;
-        justify-content: flex-start;
+        height: 42px;
     }
 
     .bottom-controls::-webkit-scrollbar {
         display: none;
     }
 
-    .bottom-controls span:first-child {
-        font-size: 0.65rem !important;
-        margin-right: 0 !important;
+    .hud-btn {
+        height: 34px;
+        min-height: 34px;
+        padding: 5px 10px;
+        font-size: 0.72rem;
         flex-shrink: 0;
+    }
+
+    .side-panel {
+        top: 76px;
+        right: 14px;
+        width: 320px;
+        max-height: calc(100vh - 100px);
+    }
+}
+
+/* 2. SMARTFONY I TABLETY PIONOWE (Szerokość <= 768px) */
+@media (max-width: 768px) {
+    /* Kompaktowe logo ARTBAR u góry */
+    .top-header {
+        top: 8px;
+        left: 8px;
+        height: 32px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        gap: 6px;
+        z-index: 120;
+    }
+
+    .brand-title {
+        font-size: 0.85rem;
+        letter-spacing: 1.2px;
+    }
+
+    .brand-subtitle {
+        display: none;
+    }
+
+    /* Pasek narzędzi u góry: kompaktowa wstęga w jednym rzędzie */
+    .top-actions {
+        top: 46px;
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-width: calc(100vw - 16px);
+        height: 38px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 2px 2px;
+        gap: 5px;
+        z-index: 120;
+    }
+
+    .top-actions::-webkit-scrollbar {
+        display: none;
+    }
+
+    .top-actions .btn-tool {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        min-width: auto;
+        min-height: 32px;
+        height: 32px;
+        padding: 4px 8px;
+        font-size: 0.68rem;
+        border-radius: 8px;
+        gap: 5px;
+        white-space: nowrap;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    .top-actions .btn-tool svg {
+        width: 16px;
+        height: 16px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+    }
+
+    /* Krótkie napisy na przyciskach dla oszczędności miejsca */
+    .btn-tool-txt {
+        display: none;
+    }
+
+    .btn-tool::after {
+        content: attr(data-short);
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+
+    /* Dolny pasek modułów i widoków: pełna szerokość bez clippingu scrolla */
+    .bottom-controls {
+        bottom: max(8px, env(safe-area-inset-bottom));
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-width: calc(100vw - 16px);
+        height: 40px;
+        transform: none;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 4px 8px;
+        gap: 5px;
+        border-radius: 12px;
+        z-index: 110;
+    }
+
+    .bottom-controls::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Ukrywamy zbędny napis "Dodaj:" na telefonach */
+    .bottom-controls span:first-child {
+        display: none !important;
     }
 
     .hud-btn {
-        padding: 6px 10px;
-        font-size: 0.72rem;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        height: 32px;
+        min-height: 32px;
+        padding: 4px 8px;
+        font-size: 0.70rem;
         flex-shrink: 0;
         gap: 5px;
-        min-height: 40px;
+        white-space: nowrap;
+        border-radius: 7px;
+    }
+
+    .hud-btn-txt {
+        display: none;
+    }
+
+    .hud-btn::after {
+        content: attr(data-short);
+        font-weight: 600;
+        letter-spacing: 0.2px;
     }
 
     .hud-btn svg.hud-icon {
-        width: 20px;
-        height: 20px;
-    }
-
-    .hud-divider {
-        height: 16px;
-        margin: 0 2px;
+        width: 17px;
+        height: 17px;
         flex-shrink: 0;
     }
 
-    /* Podpowiedź / Dymek na dole */
+    .hud-divider {
+        height: 18px;
+        margin: 0 2px;
+        background: rgba(255, 255, 255, 0.15);
+        flex-shrink: 0;
+    }
+
+    /* Podpowiedź / Dymek na dole ukryty na małych ekranach */
     .canvas-hint {
-        bottom: 64px;
-        left: 10px;
-        right: 10px;
-        font-size: 0.66rem;
-        padding: 6px 12px;
-        line-height: 1.35;
-        text-align: center;
-        border-radius: 8px;
-        border-left: none;
-        border-bottom: 2px solid var(--primary);
-        background: rgba(16, 16, 20, 0.88);
+        display: none !important;
     }
 
     /* Panele boczne jako nowoczesne szuflady dolne (Bottom Sheet) */
@@ -1676,20 +1738,35 @@ body, html {
 /* 3. BARDZO MAŁE EKRANY (Szerokość <= 420px) */
 @media (max-width: 420px) {
     .top-actions .btn-tool {
-        min-width: 52px;
-        min-height: 48px;
-        font-size: 0.60rem;
-        padding: 4px;
+        height: 30px;
+        min-height: 30px;
+        font-size: 0.65rem;
+        padding: 3px 6px;
+        gap: 4px;
     }
 
     .top-actions .btn-tool svg {
-        width: 18px;
-        height: 18px;
+        width: 15px;
+        height: 15px;
+    }
+
+    .bottom-controls {
+        height: 36px;
+        padding: 3px 6px;
+        gap: 4px;
     }
 
     .hud-btn {
-        padding: 5px 8px;
-        font-size: 0.68rem;
+        height: 30px;
+        min-height: 30px;
+        padding: 3px 6px;
+        font-size: 0.66rem;
+        gap: 4px;
+    }
+
+    .hud-btn svg.hud-icon {
+        width: 15px;
+        height: 15px;
     }
 
     .color-chip {
@@ -1703,11 +1780,12 @@ body, html {
     .top-header {
         top: 6px;
         left: 8px;
-        padding: 4px 10px;
+        height: 30px;
+        padding: 3px 8px;
     }
 
     .brand-title {
-        font-size: 0.85rem;
+        font-size: 0.80rem;
     }
 
     .brand-subtitle {
@@ -1718,35 +1796,49 @@ body, html {
         top: 6px;
         right: 8px;
         left: auto;
-        max-width: calc(100vw - 160px);
+        max-width: calc(100vw - 120px);
+        height: 30px;
         padding: 0;
+        gap: 4px;
     }
 
     .top-actions .btn-tool {
-        min-width: 50px;
-        min-height: 44px;
-        padding: 3px 5px;
-        font-size: 0.58rem;
+        height: 28px;
+        min-height: 28px;
+        padding: 2px 6px;
+        font-size: 0.62rem;
+        gap: 4px;
     }
 
     .top-actions .btn-tool svg {
-        width: 17px;
-        height: 17px;
+        width: 14px;
+        height: 14px;
     }
 
     .bottom-controls {
         bottom: 6px;
-        padding: 4px 8px;
+        left: 8px;
+        right: 8px;
+        height: 34px;
+        padding: 3px 6px;
+        gap: 4px;
     }
 
     .hud-btn {
-        min-height: 32px;
-        padding: 4px 8px;
-        font-size: 0.68rem;
+        height: 28px;
+        min-height: 28px;
+        padding: 3px 6px;
+        font-size: 0.65rem;
+        gap: 4px;
+    }
+
+    .hud-btn svg.hud-icon {
+        width: 15px;
+        height: 15px;
     }
 
     .canvas-hint {
-        display: none;
+        display: none !important;
     }
 
     .side-panel {
