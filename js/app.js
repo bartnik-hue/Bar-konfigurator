@@ -905,21 +905,24 @@ class ArtbarApp {
     }
 
     updateUIStats(stats) {
-        // Pasek górny
-        document.getElementById('stat-length').textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
-        document.getElementById('stat-straight').textContent = `${stats.BAR_STRAIGHT} szt.`;
-        document.getElementById('stat-corners').textContent = `${stats.BAR_CORNER} szt.`;
-        const totalFridges = (stats.BACK_FRIDGE || 0) + (stats.BACK_FRIDGE_SLIM || 0);
-        document.getElementById('stat-backbar').textContent = `${stats.BACK_SHELF} / ${totalFridges}`;
-
         // Panel podsumowania
-        document.getElementById('sum-straight').textContent = `${stats.BAR_STRAIGHT} szt.`;
-        document.getElementById('sum-corners').textContent = `${stats.BAR_CORNER} szt.`;
-        document.getElementById('sum-shelves').textContent = `${stats.BACK_SHELF} szt.`;
-        document.getElementById('sum-fridges').textContent = `${stats.BACK_FRIDGE} szt.`;
+        const sumStraight = document.getElementById('sum-straight');
+        if (sumStraight) sumStraight.textContent = `${stats.BAR_STRAIGHT} szt.`;
+
+        const sumCorners = document.getElementById('sum-corners');
+        if (sumCorners) sumCorners.textContent = `${stats.BAR_CORNER} szt.`;
+
+        const sumShelves = document.getElementById('sum-shelves');
+        if (sumShelves) sumShelves.textContent = `${stats.BACK_SHELF} szt.`;
+
+        const sumFridges = document.getElementById('sum-fridges');
+        if (sumFridges) sumFridges.textContent = `${stats.BACK_FRIDGE} szt.`;
+
         const sumFridgesSlim = document.getElementById('sum-fridges-slim');
         if (sumFridgesSlim) sumFridgesSlim.textContent = `${stats.BACK_FRIDGE_SLIM || 0} szt.`;
-        document.getElementById('sum-total-length').textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
+
+        const sumTotalLength = document.getElementById('sum-total-length');
+        if (sumTotalLength) sumTotalLength.textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
     }
 
     showToast(message) {
