@@ -215,89 +215,165 @@
         </div>
     </div>
 
-    <!-- WYSKIWANY PANEL BOCZNY: BRANDING -->
-    <div class="side-panel" id="panel-branding">
+    <!-- WYSKIWANY PANEL BOCZNY: BRANDING & TŁO FRONTÓW -->
+    <div class="side-panel" id="panel-branding" style="width: 360px;">
         <div class="panel-header">
-            <span class="panel-title">Personalizacja / Branding</span>
+            <span class="panel-title">Branding & Grafika Baru</span>
             <button class="panel-close-btn">&times;</button>
         </div>
         <div class="panel-content">
-            <div class="setting-toggle-row" style="margin-bottom: 16px; padding: 12px 14px; background: rgba(255,255,255,0.04); border-radius: var(--radius-md); border: 1px solid var(--bg-panel-border); display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <div style="font-weight: 600; font-size: 0.86rem; color: var(--text-main);">Włącz branding / logo</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Wyświetl grafikę na frontach baru prostego</div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="branding-enable-toggle">
-                    <span class="switch-slider"></span>
-                </label>
-            </div>
-
-            <div class="upload-dropzone" id="branding-dropzone">
-                <span class="upload-icon">📁</span>
-                <div class="upload-txt">Kliknij lub przeciągnij grafikę</div>
-                <div class="upload-hint">Format PNG, JPG lub SVG (zalecana wysoka rozdzielczość)</div>
-                <input type="file" id="branding-file-input" accept="image/*" style="display: none;">
-            </div>
-
-            <div class="texture-preview-box" id="branding-preview-box">
-                <span class="stat-label">Podgląd wgranej grafiki:</span>
-                <img class="texture-thumb" id="branding-preview-img" src="" alt="Podgląd">
-                <div style="display: flex; gap: 8px;">
-                    <button class="btn-tool active" id="btn-apply-branding" style="flex: 1; justify-content: center;">Zastosuj do wszystkich frontów</button>
-                    <button class="btn-tool" id="btn-reset-branding" style="flex: 1; justify-content: center;">Resetuj</button>
-                </div>
-            </div>
-
-            <!-- KONTROLKI SKALI I ROZMIARU BRANDINGU -->
-            <div class="scene-group" id="branding-adjust-controls" style="display: none; margin-top: 12px;">
-                <div class="scene-group-title" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Dopasowanie grafiki</span>
-                    <button class="btn-micro" id="btn-auto-aspect" title="Dopasuj rozmiar do oryginalnych proporcji pliku graficznego">Auto-proporcje</button>
-                </div>
-
-                <!-- Skala ogólna -->
-                <div class="scene-control-row">
-                    <div class="scene-label-val">
-                        <span>Skala:</span>
-                        <strong id="val-branding-scale">100%</strong>
-                    </div>
-                    <input type="range" id="slider-branding-scale" min="20" max="250" step="1" value="100" class="scene-slider">
-                </div>
-
-                <!-- Blokada proporcji checkbox -->
-                <div style="display: flex; align-items: center; justify-content: space-between; margin: 4px 0;">
-                    <label for="toggle-branding-lock-aspect" style="font-size: 0.76rem; color: var(--text-muted); cursor: pointer;">
-                        Zablokuj proporcje (AR)
+            <!-- SEKCJA 1: TŁO FRONTÓW (GRAFIKA PANORAMICZNA CIĄGŁA) -->
+            <div class="scene-group" id="group-panorama-bg">
+                <div class="branding-section-header">
+                    <span class="branding-section-title">1. Tło Frontów (Panorama)</span>
+                    <label class="switch" title="Włącz lub wyłącz tło panoramiczne na frontach">
+                        <input type="checkbox" id="toggle-panorama-enable">
+                        <span class="switch-slider"></span>
                     </label>
-                    <input type="checkbox" id="toggle-branding-lock-aspect" checked style="accent-color: var(--primary); cursor: pointer;">
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+                    Grafika rozciąga się w płynną całość na wszystkich połączonych barach w ciągu.
                 </div>
 
-                <!-- Szerokość -->
-                <div class="scene-control-row">
-                    <div class="scene-label-val">
-                        <span>Szerokość:</span>
-                        <strong id="val-branding-width">1.20 m</strong>
-                    </div>
-                    <input type="range" id="slider-branding-width" min="0.20" max="1.45" step="0.01" value="1.20" class="scene-slider">
+                <!-- Tryb mapowania: Ciągła panorama vs Powtarzaj na module -->
+                <div class="panorama-mode-selector">
+                    <button class="panorama-mode-btn active" id="btn-mode-chain" data-mode="chain" title="Grafika tworzy jedną ciągłą całość na wszystkich modułach w linii">
+                        Ciągły pas (Cały bar)
+                    </button>
+                    <button class="panorama-mode-btn" id="btn-mode-repeat" data-mode="repeat" title="Każdy moduł powtarza całą grafikę">
+                        Powtarzaj moduł
+                    </button>
                 </div>
 
-                <!-- Wysokość -->
-                <div class="scene-control-row">
-                    <div class="scene-label-val">
-                        <span>Wysokość:</span>
-                        <strong id="val-branding-height">0.45 m</strong>
+                <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-top: 6px;">
+                    Wybierz gotowy wzór z katalogu:
+                </div>
+                <!-- Miniatury gotowych grafik -->
+                <div class="panorama-presets-grid" id="panorama-presets-container">
+                    <div class="panorama-card" data-preset="graffitilike">
+                        <img class="panorama-thumb" src="grafiki/graffitilike.jpg" alt="Graffiti Art">
+                        <span class="panorama-title">Graffiti Art</span>
                     </div>
-                    <input type="range" id="slider-branding-height" min="0.10" max="0.75" step="0.01" value="0.45" class="scene-slider">
+                    <div class="panorama-card" data-preset="kamienieszlachetne">
+                        <img class="panorama-thumb" src="grafiki/kamienieszlachetne.jpg" alt="Kamienie Szlachetne">
+                        <span class="panorama-title">Kamienie Szlachetne</span>
+                    </div>
+                    <div class="panorama-card" data-preset="kwiaty2">
+                        <img class="panorama-thumb" src="grafiki/kwiaty2.jpg" alt="Kwiaty Botaniczne">
+                        <span class="panorama-title">Kwiaty Botaniczne</span>
+                    </div>
+                    <div class="panorama-card" data-preset="kwiaty3">
+                        <img class="panorama-thumb" src="grafiki/kwiaty3.jpg" alt="Kwiaty Egzotyczne">
+                        <span class="panorama-title">Kwiaty Egzotyczne</span>
+                    </div>
+                    <div class="panorama-card" data-preset="palmy">
+                        <img class="panorama-thumb" src="grafiki/palmy.jpg" alt="Palmy Tropikalne">
+                        <span class="panorama-title">Palmy Tropikalne</span>
+                    </div>
+                    <div class="panorama-card" data-preset="turku">
+                        <img class="panorama-thumb" src="grafiki/turku.jpg" alt="Turkus & Złoto">
+                        <span class="panorama-title">Turkus & Złoto</span>
+                    </div>
+                    <div class="panorama-card" data-preset="zloto" style="grid-column: span 2;">
+                        <img class="panorama-thumb" src="grafiki/zloto.jpg" alt="Złota Elegancja">
+                        <span class="panorama-title">Złota Elegancja</span>
+                    </div>
                 </div>
 
-                <!-- Pozycja pionowa Y -->
-                <div class="scene-control-row">
-                    <div class="scene-label-val">
-                        <span>Wysokość na barze (Pion):</span>
-                        <strong id="val-branding-posy">0.55 m</strong>
+                <!-- Wgranie własnego tła -->
+                <div class="upload-dropzone" id="panorama-dropzone" style="padding: 12px 10px; margin-top: 6px;">
+                    <span style="font-size: 1.2rem; display: block; margin-bottom: 2px;">🖼</span>
+                    <div class="upload-txt" style="font-size: 0.78rem;">Wgraj własną grafikę panoramiczną</div>
+                    <div class="upload-hint">Format JPG lub PNG (podłużny format)</div>
+                    <input type="file" id="panorama-file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button class="btn-tool" id="btn-reset-panorama" style="flex: 1; justify-content: center; font-size: 0.75rem;">
+                        Przywróć domyślny front
+                    </button>
+                </div>
+            </div>
+
+            <!-- SEKCJA 2: LOGOTYP / BRANDING NAKŁADKOWY -->
+            <div class="scene-group" id="group-logo-overlay">
+                <div class="branding-section-header">
+                    <span class="branding-section-title">2. Logotyp (Nakładka)</span>
+                    <label class="switch" title="Włącz lub wyłącz logotyp na frontach">
+                        <input type="checkbox" id="branding-enable-toggle">
+                        <span class="switch-slider"></span>
+                    </label>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+                    Logotyp marki lub klienta wyświetlany centralnie na modułach baru.
+                </div>
+
+                <div class="upload-dropzone" id="branding-dropzone" style="padding: 14px 10px;">
+                    <span class="upload-icon" style="font-size: 1.4rem; margin-bottom: 4px;">📁</span>
+                    <div class="upload-txt">Wgraj plik logo</div>
+                    <div class="upload-hint">PNG z przezroczystością, JPG lub SVG</div>
+                    <input type="file" id="branding-file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <div class="texture-preview-box" id="branding-preview-box">
+                    <span class="stat-label">Podgląd wgranego logo:</span>
+                    <img class="texture-thumb" id="branding-preview-img" src="" alt="Podgląd logo">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-tool active" id="btn-apply-branding" style="flex: 1; justify-content: center;">Zastosuj do frontów</button>
+                        <button class="btn-tool" id="btn-reset-branding" style="flex: 1; justify-content: center;">Usuń logo</button>
                     </div>
-                    <input type="range" id="slider-branding-posy" min="0.25" max="0.85" step="0.01" value="0.55" class="scene-slider">
+                </div>
+
+                <!-- KONTROLKI SKALI I ROZMIARU BRANDINGU -->
+                <div id="branding-adjust-controls" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 0.76rem; font-weight: 600; color: var(--primary); text-transform: uppercase;">Dopasowanie logo</span>
+                        <button class="btn-micro" id="btn-auto-aspect" title="Dopasuj rozmiar do oryginalnych proporcji pliku graficznego">Auto-proporcje</button>
+                    </div>
+
+                    <!-- Skala ogólna -->
+                    <div class="scene-control-row">
+                        <div class="scene-label-val">
+                            <span>Skala:</span>
+                            <strong id="val-branding-scale">100%</strong>
+                        </div>
+                        <input type="range" id="slider-branding-scale" min="20" max="250" step="1" value="100" class="scene-slider">
+                    </div>
+
+                    <!-- Blokada proporcji checkbox -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin: 4px 0;">
+                        <label for="toggle-branding-lock-aspect" style="font-size: 0.76rem; color: var(--text-muted); cursor: pointer;">
+                            Zablokuj proporcje (AR)
+                        </label>
+                        <input type="checkbox" id="toggle-branding-lock-aspect" checked style="accent-color: var(--primary); cursor: pointer;">
+                    </div>
+
+                    <!-- Szerokość -->
+                    <div class="scene-control-row">
+                        <div class="scene-label-val">
+                            <span>Szerokość:</span>
+                            <strong id="val-branding-width">1.20 m</strong>
+                        </div>
+                        <input type="range" id="slider-branding-width" min="0.20" max="1.45" step="0.01" value="1.20" class="scene-slider">
+                    </div>
+
+                    <!-- Wysokość -->
+                    <div class="scene-control-row">
+                        <div class="scene-label-val">
+                            <span>Wysokość:</span>
+                            <strong id="val-branding-height">0.45 m</strong>
+                        </div>
+                        <input type="range" id="slider-branding-height" min="0.10" max="0.75" step="0.01" value="0.45" class="scene-slider">
+                    </div>
+
+                    <!-- Pozycja pionowa Y -->
+                    <div class="scene-control-row">
+                        <div class="scene-label-val">
+                            <span>Wysokość na barze (Pion):</span>
+                            <strong id="val-branding-posy">0.55 m</strong>
+                        </div>
+                        <input type="range" id="slider-branding-posy" min="0.25" max="0.85" step="0.01" value="0.55" class="scene-slider">
+                    </div>
                 </div>
             </div>
         </div>
@@ -419,6 +495,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=31"></script>
+    <script type="module" src="js/app.js?v=32"></script>
 </body>
 </html>

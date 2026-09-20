@@ -662,6 +662,105 @@ body, html {
     border: 1px solid var(--primary);
 }
 
+/* PANORAMA BACKGROUND PRESETS */
+.panorama-presets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.panorama-card {
+    background: #191919;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    padding: 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.panorama-card:hover {
+    border-color: var(--primary);
+    background: rgba(250, 203, 125, 0.08);
+    transform: translateY(-2px);
+}
+
+.panorama-card.active {
+    border-color: var(--primary);
+    background: rgba(250, 203, 125, 0.15);
+    box-shadow: 0 0 10px rgba(250, 203, 125, 0.35);
+}
+
+.panorama-thumb {
+    width: 100%;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 3px;
+    display: block;
+}
+
+.panorama-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.panorama-mode-selector {
+    display: flex;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.panorama-mode-btn {
+    flex: 1;
+    padding: 6px 4px;
+    background: #191919;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.70rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.panorama-mode-btn:hover {
+    color: var(--text-main);
+    border-color: var(--primary);
+}
+
+.panorama-mode-btn.active {
+    background: rgba(250, 203, 125, 0.15);
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.branding-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(250, 203, 125, 0.2);
+    margin-bottom: 8px;
+}
+
+.branding-section-title {
+    font-size: 0.80rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
 /* PRESETS GRID */
 .presets-grid {
     display: grid;

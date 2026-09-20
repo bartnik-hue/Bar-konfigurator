@@ -312,11 +312,46 @@ export class ModelRegistry {
         return false;
     }
 
+    normalizeFrontUVs(geometry) {
+        if (!geometry || !geometry.attributes.position || !geometry.attributes.uv) return;
+        const pos = geometry.attributes.position;
+        const uv = geometry.attributes.uv;
+
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i);
+            const y = pos.getY(i);
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+
+        const spanX = maxX - minX || 1;
+        const spanY = maxY - minY || 1;
+
+        for (let i = 0; i < pos.count; i++) {
+            const u = (pos.getX(i) - minX) / spanX;
+            const v = (pos.getY(i) - minY) / spanY;
+            uv.setXY(i, u, v);
+        }
+        uv.needsUpdate = true;
+    }
+
     setupShadowsAndMaterials(root, modelKey) {
         root.traverse(child => {
             if (child.isMesh) {
                 child.castShadow = true;
                 child.receiveShadow = true;
+
+                // Oznacz siatki z materiałem 'front' dla tła panoramicznego i znormalizuj ich UV
+                const mats = Array.isArray(child.material) ? child.material : [child.material];
+                const hasFrontMat = mats.some(m => m && (m.name === 'front' || m.name.toLowerCase().includes('front')));
+                if (hasFrontMat) {
+                    child.userData.isFrontPanel = true;
+                    this.normalizeFrontUVs(child.geometry);
+                }
 
                 // Oznacz siatki frontowe dla brandingu
                 if (this.isBrandingTarget(child)) {
@@ -346,6 +381,15 @@ export class ModelRegistry {
         }
 
         const clone = template.clone(true);
+
+        // Klonuj materiały instancji, aby moduły mogły mieć unikalne mapowanie UV panoramy
+        clone.traverse(child => {
+            if (child.isMesh && child.material) {
+                child.material = Array.isArray(child.material)
+                    ? child.material.map(m => m.clone())
+                    : child.material.clone();
+            }
+        });
 
         // Główny wrapper modułu w scenie
         const wrapper = new THREE.Group();

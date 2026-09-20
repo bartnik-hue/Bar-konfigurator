@@ -20,10 +20,13 @@ class ArtbarApp {
         this.barBuilder = new BarBuilder(this.scene, this.camera, this.renderer, this.registry, (stats) => this.updateUIStats(stats));
         this.brandingManager = new BrandingManager(this.barBuilder, this.registry);
 
-        // Automatyczne nakładanie bieżącego brandingu na nowo dodawane moduły
+        // Automatyczne nakładanie bieżącego brandingu i tła na nowo dodawane moduły
         this.barBuilder.onModuleAdded = (moduleData) => {
             if (this.brandingManager.currentTexture) {
                 this.brandingManager.applyToModule(moduleData, this.brandingManager.currentTexture);
+            }
+            if (this.brandingManager.isBackgroundEnabled) {
+                this.brandingManager.updateFrontPanoramas();
             }
         };
 
@@ -688,11 +691,12 @@ class ArtbarApp {
                     const savedBitmap = (typeof imported === 'string') ? imported : imported?.brandingDataUrl;
                     const savedSettings = (typeof imported === 'object') ? imported?.brandingSettings : null;
 
+                    if (savedSettings) {
+                        this.brandingManager.applySettings(savedSettings);
+                    }
+
                     if (savedBitmap) {
                         this.brandingManager.loadGraphicFromDataUrl(savedBitmap, (dataUrl) => {
-                            if (savedSettings) {
-                                this.brandingManager.applySettings(savedSettings);
-                            }
                             document.getElementById('branding-preview-img').src = dataUrl;
                             document.getElementById('branding-preview-box').style.display = 'flex';
                             document.getElementById('branding-adjust-controls').style.display = 'block';
@@ -700,7 +704,6 @@ class ArtbarApp {
                             if (toggle) toggle.checked = true;
                             this.brandingManager.setEnabled(true);
                         });
-                        this.showToast('Układ oraz wgrana grafika zostały pomyślnie wczytane!');
                     } else {
                         this.brandingManager.resetBranding();
                         const toggle = document.getElementById('branding-enable-toggle');
@@ -708,8 +711,8 @@ class ArtbarApp {
                         this.brandingManager.setEnabled(false);
                         document.getElementById('branding-preview-box').style.display = 'none';
                         document.getElementById('branding-adjust-controls').style.display = 'none';
-                        this.showToast('Układ baru został pomyślnie wczytany!');
                     }
+                    this.showToast('Układ baru oraz grafiki zostały wczytane!');
                 } catch (err) {
                     console.error('Błąd wczytywania pliku projektu:', err);
                     alert('Nie udało się wczytać pliku. Upewnij się, że to poprawny plik konfiguracyjny Artbar (.json).');
@@ -725,7 +728,7 @@ class ArtbarApp {
         this.setupSidePanel('btn-open-calib', 'panel-calibration');
         this.setupSidePanel('btn-open-summary', 'panel-summary');
 
-        // Presety
+        // Presety gotowych układów baru
         document.querySelectorAll('.preset-card').forEach(card => {
             card.addEventListener('click', () => {
                 const preset = card.dataset.preset;
@@ -734,7 +737,108 @@ class ArtbarApp {
             });
         });
 
-        // Branding Toggle Switch
+        // ==========================================
+        // TŁO PANORAMICZNE (materiał 'front')
+        // ==========================================
+        const togglePanorama = document.getElementById('toggle-panorama-enable');
+        togglePanorama?.addEventListener('change', (e) => {
+            this.brandingManager.setBackgroundEnabled(e.target.checked);
+            if (e.target.checked) {
+                this.showToast('Włączono tło panoramiczne na frontach baru.');
+            } else {
+                this.showToast('Wyłączono tło panoramiczne na frontach.');
+            }
+        });
+
+        // Wybór trybu mapowania (ciągły pas vs powtarzanie modułu)
+        const btnModeChain = document.getElementById('btn-mode-chain');
+        const btnModeRepeat = document.getElementById('btn-mode-repeat');
+
+        btnModeChain?.addEventListener('click', () => {
+            btnModeChain.classList.add('active');
+            btnModeRepeat?.classList.remove('active');
+            this.brandingManager.setBackgroundMode('chain');
+            this.showToast('Tryb tła: Ciągły pas (płynna panorama na całym ciągu baru).');
+        });
+
+        btnModeRepeat?.addEventListener('click', () => {
+            btnModeRepeat.classList.add('active');
+            btnModeChain?.classList.remove('active');
+            this.brandingManager.setBackgroundMode('repeat');
+            this.showToast('Tryb tła: Powtarzaj pełną grafikę na każdym module.');
+        });
+
+        // Wybór z gotowych wzorów (karty miniatur)
+        const presetCards = document.querySelectorAll('.panorama-card');
+        presetCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const presetId = card.dataset.preset;
+                presetCards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+
+                if (togglePanorama && !togglePanorama.checked) {
+                    togglePanorama.checked = true;
+                }
+
+                this.brandingManager.setBackgroundPreset(presetId, () => {
+                    const title = card.querySelector('.panorama-title')?.textContent || presetId;
+                    this.showToast(`Zastosowano tło panoramiczne: ${title}`);
+                });
+            });
+        });
+
+        // Wgranie własnego pliku tła panoramicznego
+        const panoDropzone = document.getElementById('panorama-dropzone');
+        const panoFileInput = document.getElementById('panorama-file-input');
+        panoDropzone?.addEventListener('click', () => panoFileInput?.click());
+
+        panoFileInput?.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                this.handlePanoramaFile(e.target.files[0]);
+            }
+        });
+
+        panoDropzone?.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            panoDropzone.style.borderColor = '#FACB7D';
+        });
+        panoDropzone?.addEventListener('dragleave', () => {
+            panoDropzone.style.borderColor = '';
+        });
+        panoDropzone?.addEventListener('drop', (e) => {
+            e.preventDefault();
+            panoDropzone.style.borderColor = '';
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                this.handlePanoramaFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // Reset tła panoramicznego do domyślnego materiału
+        document.getElementById('btn-reset-panorama')?.addEventListener('click', () => {
+            this.brandingManager.resetBackgroundGraphic();
+            if (togglePanorama) togglePanorama.checked = false;
+            presetCards.forEach(c => c.classList.remove('active'));
+            this.showToast('Przywrócono domyślny materiał frontów baru.');
+        });
+
+        // Synchronizacja UI przy zmianie stanu tła
+        this.brandingManager.onBackgroundChanged = (bg) => {
+            if (togglePanorama) togglePanorama.checked = bg.enabled;
+            presetCards.forEach(c => {
+                c.classList.toggle('active', c.dataset.preset === bg.presetId);
+            });
+            if (bg.mode === 'chain') {
+                btnModeChain?.classList.add('active');
+                btnModeRepeat?.classList.remove('active');
+            } else {
+                btnModeRepeat?.classList.add('active');
+                btnModeChain?.classList.remove('active');
+            }
+        };
+
+        // ==========================================
+        // LOGOTYP / BRANDING NAKŁADKOWY
+        // ==========================================
         const brandingToggle = document.getElementById('branding-enable-toggle');
         brandingToggle?.addEventListener('change', (e) => {
             this.brandingManager.setEnabled(e.target.checked);
@@ -920,7 +1024,16 @@ class ArtbarApp {
                 toggle.checked = true;
                 this.brandingManager.setEnabled(true);
             }
-            this.showToast('Wgrano grafikę i zaktualizowano fronty baru!');
+            this.showToast('Wgrano grafikę logo i zaktualizowano fronty baru!');
+        });
+    }
+
+    handlePanoramaFile(file) {
+        this.brandingManager.loadBackgroundFromFile(file, () => {
+            const toggle = document.getElementById('toggle-panorama-enable');
+            if (toggle && !toggle.checked) toggle.checked = true;
+            document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
+            this.showToast('Wgrano własną grafikę panoramiczną na fronty baru!');
         });
     }
 
@@ -995,6 +1108,11 @@ class ArtbarApp {
 
         const sumTotalLength = document.getElementById('sum-total-length');
         if (sumTotalLength) sumTotalLength.textContent = `${stats.totalFrontMeters.toFixed(1)} m`;
+
+        // Automatycznie zaktualizuj podział panoramy na ciągach barów po każdej zmianie na scenie
+        if (this.brandingManager && this.brandingManager.isBackgroundEnabled) {
+            this.brandingManager.updateFrontPanoramas();
+        }
     }
 
     showToast(message) {
