@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Artbar Solutions - Konfigurator Barów Eventowych 3D</title>
-    <link rel="stylesheet" href="css/style.css?v=51">
+    <link rel="stylesheet" href="css/style.css?v=52">
     <!-- Google Fonts: Montserrat & Cinzel dla luksusowego wyglądu -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -430,6 +430,12 @@
                         Przywróć domyślny front
                     </button>
                 </div>
+
+                <!-- Przycisk kalibracji zgrania tekstury na narożnikach -->
+                <button type="button" class="btn-tool" id="btn-open-texture-tuner" style="width: 100%; margin-top: 10px; justify-content: center; background: rgba(250, 203, 125, 0.12); border: 1px solid var(--primary); color: var(--primary); font-weight: 700; font-size: 0.8rem; padding: 9px 12px; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                    <span>📐 Kalibrator zgrania tekstury na rogu</span>
+                </button>
             </div>
 
             <!-- SEKCJA 2: LOGOTYP / BRANDING NAKŁADKOWY -->
@@ -670,6 +676,119 @@
         </div>
     </div>
 
+    <!-- WYSKIWANY PANEL BOCZNY: KALIBRACJA ZGRANIA TEKSTURY (TUNER OFFSETÓW) -->
+    <div class="side-panel" id="panel-texture-tuner" style="width: 380px;">
+        <div class="panel-header">
+            <span class="panel-title">📐 Zgranie Tekstury Frontu</span>
+            <button class="panel-close-btn">&times;</button>
+        </div>
+        <div class="panel-content">
+            <div style="font-size: 0.73rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+                Dostrajaj przesunięcie i skalę tekstury w czasie rzeczywistym, aby idealnie zgrać wzór na łączeniu modułu prostego z narożnikiem.
+            </div>
+
+            <!-- Wybór modułu -->
+            <div class="scene-group">
+                <div class="scene-group-title">Wybierz moduł do regulacji:</div>
+                <select id="tuner-select-module" class="scene-select" style="font-weight: 600; color: var(--primary);">
+                    <option value="BAR_CORNER_LEFT" selected>Narożnik Lewy 90° (BAR_CORNER_LEFT)</option>
+                    <option value="BAR_CORNER_RIGHT">Narożnik Prawy 90° (BAR_CORNER_RIGHT)</option>
+                    <option value="BAR_STRAIGHT">Moduł Prosty Baru (BAR_STRAIGHT)</option>
+                </select>
+            </div>
+
+            <!-- Offset U (Przesunięcie w poziomie) -->
+            <div class="scene-group">
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Offset U (Poziom):</span>
+                        <strong id="val-tuner-offset-u">0.000</strong>
+                    </div>
+                    <input type="number" id="input-tuner-offset-u" step="0.001" value="0.000" class="tuner-num-input">
+                </div>
+                <input type="range" id="slider-tuner-offset-u" min="-2.0" max="2.0" step="0.001" value="0.0" class="scene-slider">
+                <!-- Przyciski mikro-kroków -->
+                <div class="tuner-micro-btns">
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="-0.1">-10cm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="-0.01">-1cm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="-0.001">-1mm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="0.001">+1mm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="0.01">+1cm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetU" data-step="0.1">+10cm</button>
+                </div>
+            </div>
+
+            <!-- Skala / Repeat U (Rozciągnięcie w poziomie) -->
+            <div class="scene-group">
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Skala U (Szerokość):</span>
+                        <strong id="val-tuner-repeat-u">1.000</strong>
+                    </div>
+                    <input type="number" id="input-tuner-repeat-u" step="0.001" value="1.000" class="tuner-num-input">
+                </div>
+                <input type="range" id="slider-tuner-repeat-u" min="0.2" max="3.0" step="0.001" value="1.0" class="scene-slider">
+                <div class="tuner-micro-btns">
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="-0.05">-5%</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="-0.01">-1%</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="-0.001">-0.1%</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="0.001">+0.1%</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="0.01">+1%</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="repeatU" data-step="0.05">+5%</button>
+                </div>
+            </div>
+
+            <!-- Odwrócenie kierunku poziomo (Flip U) -->
+            <div class="scene-group" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 0.82rem; font-weight: 600; color: #fff;">Odwróć kierunek (Flip U)</div>
+                    <div style="font-size: 0.70rem; color: var(--text-muted);">Zmień kierunek biegu tekstury</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-tuner-flip-u">
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+
+            <!-- Offset V (Przesunięcie w pionie) -->
+            <div class="scene-group">
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Offset V (Pion):</span>
+                        <strong id="val-tuner-offset-v">0.000</strong>
+                    </div>
+                    <input type="number" id="input-tuner-offset-v" step="0.001" value="0.000" class="tuner-num-input">
+                </div>
+                <input type="range" id="slider-tuner-offset-v" min="-1.0" max="1.0" step="0.001" value="0.0" class="scene-slider">
+                <div class="tuner-micro-btns">
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetV" data-step="-0.01">-1cm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetV" data-step="-0.001">-1mm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetV" data-step="0.001">+1mm</button>
+                    <button type="button" class="btn-micro tuner-step-btn" data-target="offsetV" data-step="0.01">+1cm</button>
+                </div>
+            </div>
+
+            <!-- Wygenerowane parametry do przekazania -->
+            <div class="scene-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span class="scene-group-title" style="margin-bottom: 0;">Parametry do skopiowania:</span>
+                    <button type="button" class="btn-micro" id="btn-tuner-copy" style="color: var(--primary); font-weight: 700; padding: 4px 8px;">📋 Kopiuj parametry</button>
+                </div>
+                <textarea id="tuner-output-json" readonly style="width: 100%; height: 110px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; font-family: monospace; font-size: 0.72rem; color: #a5d6a7; padding: 6px; resize: none;"></textarea>
+            </div>
+
+            <!-- Akcje resetu -->
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button type="button" class="btn-tool" id="btn-tuner-reset-current" style="flex: 1; justify-content: center; font-size: 0.75rem;">
+                    ↺ Resetuj ten moduł
+                </button>
+                <button type="button" class="btn-tool" id="btn-tuner-reset-all" style="flex: 1; justify-content: center; font-size: 0.75rem;">
+                    ↺ Resetuj wszystko
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- WYSKIWANY PANEL BOCZNY: KALIBRACJA OFFSETÓW (ADMIN) -->
     <div class="side-panel" id="panel-calibration">
         <div class="panel-header">
@@ -858,6 +977,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=51"></script>
+    <script type="module" src="js/app.js?v=52"></script>
 </body>
 </html>

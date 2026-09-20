@@ -50,6 +50,12 @@ export class BrandingManager {
 
         this.onDimensionsChanged = null;
         this.onBackgroundChanged = null;
+
+        // ==========================================
+        // 3. KALIBRACJA ZGRANIA TEKSTURY (OFFSET / SKALA)
+        // ==========================================
+        this.textureTuning = this.getDefaultTextureTuning();
+        this.loadTextureTuning();
     }
 
     // ==========================================
@@ -366,29 +372,41 @@ export class BrandingManager {
                         }
 
                         if (this.isBackgroundEnabled && sharedTex) {
-                            // Sklonuj teksturę dla tego konkretnego modułu, aby nadać unikalny repeat i offset
-                            const texClone = sharedTex.clone();
-                            texClone.wrapS = THREE.RepeatWrapping;
-                            texClone.wrapT = THREE.ClampToEdgeWrapping;
-
+                            // Pobierz parametry kalibracji (offset, skala, flip) dla tego typu modułu
+                            const tuning = this.getTextureTuning(moduleData.modelKey);
                             const span = this.backgroundSpanModules || 5;
                             const spanMeters = span * 1.50; // np. 5 modułów po 1.5m = 7.50m
 
+                            // Wykorzystaj istniejący klon tekstury lub stwórz nowy jeśli trzeba
+                            let texClone = mat.map;
+                            if (!texClone || !texClone.isTexture || texClone.image !== sharedTex.image) {
+                                texClone = sharedTex.clone();
+                                texClone.wrapS = THREE.RepeatWrapping;
+                                texClone.wrapT = THREE.ClampToEdgeWrapping;
+                                mat.map = texClone;
+                            }
+
+                            const repeatFactor = (tuning.repeatU !== undefined && tuning.repeatU !== null) ? Number(tuning.repeatU) : 1.0;
+                            const flip = !!tuning.flipU;
+                            const offU = Number(tuning.offsetU) || 0.0;
+                            const offV = Number(tuning.offsetV) || 0.0;
+
                             if (this.backgroundMode === 'chain') {
-                                const fracWidth = frontLengthMeters / spanMeters;
-                                if (isReversed) {
+                                const fracWidth = (frontLengthMeters / spanMeters) * repeatFactor;
+                                const shouldReverse = flip ? !isReversed : isReversed;
+
+                                if (shouldReverse) {
                                     texClone.repeat.set(-fracWidth, 1);
-                                    texClone.offset.set(((accumMeters + frontLengthMeters) / spanMeters) % 1.0, 0);
+                                    texClone.offset.set((((accumMeters + frontLengthMeters) / spanMeters) + offU) % 1.0, offV);
                                 } else {
                                     texClone.repeat.set(fracWidth, 1);
-                                    texClone.offset.set((accumMeters / spanMeters) % 1.0, 0);
+                                    texClone.offset.set(((accumMeters / spanMeters) + offU) % 1.0, offV);
                                 }
                             } else {
-                                texClone.repeat.set(1, 1);
-                                texClone.offset.set(0, 0);
+                                const repeatX = repeatFactor * (flip ? -1 : 1);
+                                texClone.repeat.set(repeatX, 1);
+                                texClone.offset.set(offU % 1.0, offV);
                             }
-                            texClone.needsUpdate = true;
-                            mat.map = texClone;
                             mat.color.set(0xffffff);
                             mat.needsUpdate = true;
                         } else {
@@ -426,6 +444,75 @@ export class BrandingManager {
         });
     }
 
+    // ==========================================
+    // METODY KALIBRACJI TEKSTURY (OFFSET / SKALA)
+    // ==========================================
+
+    getDefaultTextureTuning() {
+        return {
+            BAR_CORNER_LEFT:  { offsetU: 0.0, repeatU: 1.0, flipU: false, offsetV: 0.0 },
+            BAR_CORNER_RIGHT: { offsetU: 0.0, repeatU: 1.0, flipU: false, offsetV: 0.0 },
+            BAR_STRAIGHT:     { offsetU: 0.0, repeatU: 1.0, flipU: false, offsetV: 0.0 }
+        };
+    }
+
+    loadTextureTuning() {
+        try {
+            const saved = localStorage.getItem('artbar_texture_tuning');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                this.textureTuning = {
+                    ...this.getDefaultTextureTuning(),
+                    ...parsed
+                };
+            }
+        } catch (e) {
+            console.warn('Nie udało się załadować dostrajania tekstur:', e);
+        }
+    }
+
+    saveTextureTuning() {
+        try {
+            localStorage.setItem('artbar_texture_tuning', JSON.stringify(this.textureTuning));
+        } catch (e) {
+            console.warn('Nie udało się zapisać dostrajania tekstur:', e);
+        }
+    }
+
+    getTextureTuning(modelKey) {
+        const key = (modelKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : modelKey;
+        const def = { offsetU: 0.0, repeatU: 1.0, flipU: false, offsetV: 0.0 };
+        return { ...def, ...(this.textureTuning[key] || {}) };
+    }
+
+    setTextureTuning(modelKey, params) {
+        const key = (modelKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : modelKey;
+        if (!this.textureTuning[key]) {
+            this.textureTuning[key] = { offsetU: 0.0, repeatU: 1.0, flipU: false, offsetV: 0.0 };
+        }
+        Object.assign(this.textureTuning[key], params);
+        this.saveTextureTuning();
+        this.updateFrontPanoramas();
+        this.notifyBackgroundChanged();
+    }
+
+    resetTextureTuning(modelKey = null) {
+        const defs = this.getDefaultTextureTuning();
+        if (modelKey) {
+            const key = (modelKey === 'BAR_CORNER') ? 'BAR_CORNER_RIGHT' : modelKey;
+            this.textureTuning[key] = { ...defs[key] };
+        } else {
+            this.textureTuning = {
+                BAR_CORNER_LEFT:  { ...defs.BAR_CORNER_LEFT },
+                BAR_CORNER_RIGHT: { ...defs.BAR_CORNER_RIGHT },
+                BAR_STRAIGHT:     { ...defs.BAR_STRAIGHT }
+            };
+        }
+        this.saveTextureTuning();
+        this.updateFrontPanoramas();
+        this.notifyBackgroundChanged();
+    }
+
     notifyBackgroundChanged() {
         if (typeof this.onBackgroundChanged === 'function') {
             this.onBackgroundChanged({
@@ -433,7 +520,8 @@ export class BrandingManager {
                 url: this.currentBackgroundUrl,
                 presetId: this.activePresetId,
                 mode: this.backgroundMode,
-                spanModules: this.backgroundSpanModules
+                spanModules: this.backgroundSpanModules,
+                textureTuning: this.textureTuning
             });
         }
     }
@@ -660,6 +748,7 @@ export class BrandingManager {
                 spanModules: this.backgroundSpanModules,
                 aiMetadata: this.aiMetadata || null
             },
+            textureTuning: this.textureTuning,
             logo: {
                 baseWidth: this.baseWidth,
                 baseHeight: this.baseHeight,
@@ -674,6 +763,15 @@ export class BrandingManager {
 
     applySettings(settings) {
         if (!settings) return;
+
+        // Dostrojenie tekstur frontu (offsety/skale narożników)
+        if (settings.textureTuning) {
+            this.textureTuning = {
+                ...this.getDefaultTextureTuning(),
+                ...settings.textureTuning
+            };
+            this.saveTextureTuning();
+        }
 
         // Tło panoramiczne
         if (settings.background) {
