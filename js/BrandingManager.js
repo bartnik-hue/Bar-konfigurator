@@ -73,22 +73,11 @@ export class BrandingManager {
         if (!tex) return;
 
         moduleData.mesh.traverse(child => {
-            // 1. Dedykowana płaszczyzna nakładki logo (Plane overlay)
+            // Dedykowana płaszczyzna nakładki logo na froncie (Plane overlay)
             if (child.isMesh && child.userData.isLogoPlane) {
                 child.material.map = tex;
                 child.material.needsUpdate = true;
                 child.visible = this.isEnabled;
-            }
-
-            // 2. Siatki frontowe oznaczone w materiale modelu GLB
-            if (child.isMesh && child.userData.isBrandingFront) {
-                if (!child.userData.originalMaterial) {
-                    child.userData.originalMaterial = child.material;
-                }
-                const customMat = child.userData.originalMaterial.clone();
-                customMat.map = tex;
-                customMat.needsUpdate = true;
-                child.material = customMat;
             }
         });
     }
@@ -108,9 +97,6 @@ export class BrandingManager {
                     child.material.map = defaultTex;
                     child.material.needsUpdate = true;
                     child.visible = this.isEnabled;
-                }
-                if (child.isMesh && child.userData.isBrandingFront && child.userData.originalMaterial) {
-                    child.material = child.userData.originalMaterial;
                 }
             });
         });

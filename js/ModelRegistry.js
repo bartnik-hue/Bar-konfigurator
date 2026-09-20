@@ -305,27 +305,10 @@ export class ModelRegistry {
     }
 
     /**
-     * Rozpoznaje, czy dany element (materiał lub obiekt) jest frontem przeznaczonym na wymienną grafikę (branding)
+     * Zastąpiono dedykowanymi nakładkami (LogoPlane).
+     * Wyłączono nadpisywanie materiałów samego modelu GLB, aby grafika nie przenikała na tył mebla.
      */
     isBrandingTarget(child) {
-        if (!child || !child.isMesh) return false;
-        const matName = (child.material?.name || '').toLowerCase();
-        const meshName = (child.name || '').toLowerCase();
-        const parentName = (child.parent?.name || '').toLowerCase();
-
-        // 1. Sprawdzenie nazwy materiału (rekomendowany standard: 'BRANDING', 'GRAFIKA', 'LOGO')
-        if (matName.includes('branding') || matName.includes('grafika') || 
-            matName.includes('logo') || matName.includes('plansza') || 
-            matName.includes('logiem')) {
-            return true;
-        }
-
-        // 2. Sprawdzenie nazwy obiektu / siatki w Blenderze ('BRANDING', 'PLANSZA')
-        if (meshName.includes('branding') || meshName.includes('plansza') ||
-            parentName.includes('branding') || parentName.includes('plansza')) {
-            return true;
-        }
-
         return false;
     }
 
@@ -413,7 +396,7 @@ export class ModelRegistry {
             polygonOffset: true,
             polygonOffsetFactor: -2,
             polygonOffsetUnits: -2,
-            side: THREE.DoubleSide
+            side: THREE.FrontSide
         });
 
         const mesh = new THREE.Mesh(geom, mat);
