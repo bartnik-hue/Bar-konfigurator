@@ -172,47 +172,44 @@ export class AiTextureService {
     }
 
     /**
+     * Zwraca bazowy adres serwera proxy (lokalnie localhost:3050 lub pusty string jeśli już jesteśmy na 3050)
+     */
+    getProxyBase() {
+        if (typeof window !== 'undefined') {
+            if (window.location.port === '3050') return '';
+            if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return 'http://127.0.0.1:3050';
+            }
+        }
+        return '';
+    }
+
+    /**
      * Sprawdza stan połączenia z ComfyUI i automatycznie wykrywa port (8000 dla Comfy Desktop lub 8188 dla Standalone)
      */
     async checkComfyUiConnection() {
-        // 1. Sprawdź autowykrywanie przez serwer konfiguratora
-        try {
-            const res = await fetch('/api/comfy-detect', { method: 'GET', headers: { 'Accept': 'application/json' } });
-            if (res.ok) {
-                const data = await res.json();
-                if (data.active) {
-                    this.comfyUiPort = data.port || 8000;
-                    this.comfyUiUrl = `http://127.0.0.1:${this.comfyUiPort}`;
-                    localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
-                    this.comfyUiInfo = data;
-                    return { ok: true, ...data };
-                }
-            }
-        } catch (e) {}
+        const proxyBase = this.getProxyBase();
+        const testUrls = [];
+        if (proxyBase) testUrls.push(`${proxyBase}/api/comfy-detect`);
+        testUrls.push('/api/comfy-detect');
 
-        // 2. Bezpośrednie testowanie portów (np. gdy konfigurator działa bez Node proxy)
-        const ports = [8000, 8188];
-        for (const p of ports) {
+        for (const testUrl of testUrls) {
             try {
-                const res = await fetch(`http://127.0.0.1:${p}/system_stats`, { method: 'GET' });
+                const res = await fetch(testUrl, { method: 'GET', headers: { 'Accept': 'application/json' } });
                 if (res.ok) {
                     const data = await res.json();
-                    this.comfyUiPort = p;
-                    this.comfyUiUrl = `http://127.0.0.1:${p}`;
-                    localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
-                    this.comfyUiInfo = {
-                        active: true,
-                        port: p,
-                        type: p === 8000 ? 'Comfy Desktop' : 'ComfyUI Standalone',
-                        version: data.system?.comfyui_version || 'unknown',
-                        devices: data.devices || []
-                    };
-                    return { ok: true, ...this.comfyUiInfo };
+                    if (data.active) {
+                        this.comfyUiPort = data.port || 8000;
+                        this.comfyUiUrl = `http://127.0.0.1:${this.comfyUiPort}`;
+                        localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
+                        this.comfyUiInfo = data;
+                        return { ok: true, ...data };
+                    }
                 }
             } catch (e) {}
         }
 
-        return { ok: false, error: 'ComfyUI nie odpowiada na portach 8000 ani 8188. Uruchom aplikację ComfyUI.' };
+        return { ok: false, error: 'ComfyUI nie odpowiada na portach 8000 ani 8188. Upewnij się, że ComfyUI i serwer konfiguratora są włączone.' };
     }
 
     /**
@@ -220,14 +217,15 @@ export class AiTextureService {
      */
     async fetchComfyUiCheckpoints() {
         await this.checkComfyUiConnection();
+        const proxyBase = this.getProxyBase();
         const portHeader = { 'x-comfy-port': String(this.comfyUiPort || 8000) };
         const collectedModels = [];
 
         // 1. Pobierz modele CheckpointLoaderSimple
-        const ckptEndpoints = [
-            '/api/comfyui/object_info/CheckpointLoaderSimple',
-            `${this.comfyUiUrl.replace(/\/+$/, '')}/object_info/CheckpointLoaderSimple`
-        ];
+        const ckptEndpoints = [];
+        if (proxyBase) ckptEndpoints.push(`${proxyBase}/api/comfyui/object_info/CheckpointLoaderSimple`);
+        ckptEndpoints.push('/api/comfyui/object_info/CheckpointLoaderSimple');
+
         for (const ep of ckptEndpoints) {
             try {
                 const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json', ...portHeader } });
@@ -243,10 +241,10 @@ export class AiTextureService {
         }
 
         // 2. Pobierz modele UNET / Diffusion
-        const unetEndpoints = [
-            '/api/comfyui/object_info/UNETLoader',
-            `${this.comfyUiUrl.replace(/\/+$/, '')}/object_info/UNETLoader`
-        ];
+        const unetEndpoints = [];
+        if (proxyBase) unetEndpoints.push(`${proxyBase}/api/comfyui/object_info/UNETLoader`);
+        unetEndpoints.push('/api/comfyui/object_info/UNETLoader');
+
         for (const ep of unetEndpoints) {
             try {
                 const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json', ...portHeader } });
@@ -407,14 +405,15 @@ export class AiTextureService {
 
         const postBody = JSON.stringify({ prompt: promptGraph, client_id: clientId });
 
-        // Endpointy do wysłania promptu (preferuj proxy serwera localhost:3050/api/comfyui, potem direct)
-        const promptUrls = [
-            '/api/comfyui/prompt',
-            `${this.comfyUiUrl.replace(/\/+$/, '')}/prompt`
-        ];
+        // Endpointy do wysłania promptu (preferuj serwer proxy port 3050, który omija blokadę CORS ComfyUI)
+        const proxyBase = this.getProxyBase();
+        const promptUrls = [];
+        if (proxyBase) promptUrls.push(`${proxyBase}/api/comfyui/prompt`);
+        promptUrls.push('/api/comfyui/prompt');
 
         let promptId = null;
         let activePrefix = '';
+        let lastError = '';
 
         for (const url of promptUrls) {
             try {
@@ -429,15 +428,21 @@ export class AiTextureService {
                     const data = await res.json();
                     if (data.prompt_id) {
                         promptId = data.prompt_id;
-                        activePrefix = url.startsWith('/api/comfyui') ? '/api/comfyui' : this.comfyUiUrl.replace(/\/+$/, '');
+                        activePrefix = url.replace(/\/prompt$/, '');
                         break;
                     }
+                } else {
+                    let errBody = '';
+                    try { errBody = await res.text(); } catch(e) {}
+                    lastError = `Status ${res.status}: ${errBody.slice(0, 200)}`;
                 }
-            } catch (e) {}
+            } catch (e) {
+                lastError = e.message;
+            }
         }
 
         if (!promptId) {
-            throw new Error(`Nie udało się połączyć z ComfyUI (${this.comfyUiUrl}). Upewnij się, że ComfyUI jest uruchomione na Twoim komputerze.`);
+            throw new Error(`Nie udało się połączyć z ComfyUI (${this.comfyUiUrl}). Upewnij się, że serwer konfiguratora (node server.js na porcie 3050) oraz ComfyUI są uruchomione. (${lastError})`);
         }
 
         // Odpytywanie o wynik generowania (polling historii)

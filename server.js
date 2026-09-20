@@ -25,8 +25,9 @@ const https = require('https');
 const server = http.createServer((req, res) => {
     // CORS headers for all requests
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Expose-Headers', '*');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204);
@@ -39,7 +40,7 @@ const server = http.createServer((req, res) => {
     // Endpoint informacyjny o dostępności API serwera
     if (reqPath === '/api/ai-status' && req.method === 'GET') {
         const hasKey = !!process.env.STABILITY_API_KEY;
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         res.end(JSON.stringify({ status: 'ok', hasEnvKey: hasKey }));
         return;
     }
@@ -84,20 +85,20 @@ const server = http.createServer((req, res) => {
                     let apiBody = '';
                     apiRes.on('data', d => { apiBody += d; });
                     apiRes.on('end', () => {
-                        res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json' });
+                        res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                         res.end(apiBody);
                     });
                 });
 
                 apiReq.on('error', (e) => {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                     res.end(JSON.stringify({ error: e.message }));
                 });
 
                 apiReq.write(postData);
                 apiReq.end();
             } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                 res.end(JSON.stringify({ error: 'Nieprawidłowy format JSON.' }));
             }
         });
@@ -136,12 +137,12 @@ const server = http.createServer((req, res) => {
             for (const p of portsToTest) {
                 const info = await checkPort(p);
                 if (info) {
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                     res.end(JSON.stringify(info));
                     return;
                 }
             }
-            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
             res.end(JSON.stringify({ active: false, error: 'Żadna instancja ComfyUI nie została wykryta na portach 8000 ani 8188.' }));
         })();
         return;
@@ -154,8 +155,18 @@ const server = http.createServer((req, res) => {
         const portParam = req.headers['x-comfy-port'] || urlObj.searchParams.get('comfyPort') || '8000';
         const targetUrl = new URL(`http://127.0.0.1:${portParam}/${subPath}`);
 
-        const forwardHeaders = { ...req.headers, host: `127.0.0.1:${portParam}` };
+        // KLUCZOWE: Usuwamy nagłówki Origin, Referer, sec-fetch-* i x-comfy-port,
+        // ponieważ Pythonowe aiohttp w ComfyUI zwraca błąd 403 Forbidden przy obecności obcego nagłówka Origin!
+        const forwardHeaders = { ...req.headers };
+        delete forwardHeaders['host'];
+        delete forwardHeaders['origin'];
+        delete forwardHeaders['referer'];
         delete forwardHeaders['x-comfy-port'];
+        delete forwardHeaders['sec-fetch-mode'];
+        delete forwardHeaders['sec-fetch-site'];
+        delete forwardHeaders['sec-fetch-dest'];
+
+        forwardHeaders['host'] = `127.0.0.1:${portParam}`;
 
         const proxyReq = http.request({
             hostname: targetUrl.hostname,
@@ -164,12 +175,17 @@ const server = http.createServer((req, res) => {
             method: req.method,
             headers: forwardHeaders
         }, (proxyRes) => {
-            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            const respHeaders = { ...proxyRes.headers };
+            respHeaders['access-control-allow-origin'] = '*';
+            respHeaders['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+            respHeaders['access-control-allow-headers'] = '*';
+
+            res.writeHead(proxyRes.statusCode, respHeaders);
             proxyRes.pipe(res);
         });
 
         proxyReq.on('error', (err) => {
-            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
             res.end(JSON.stringify({ error: `ComfyUI nie odpowiada na ${targetUrl.origin}: ${err.message}` }));
         });
 
