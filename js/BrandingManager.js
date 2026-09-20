@@ -368,6 +368,11 @@ export class BrandingManager {
                         (!Array.isArray(child.material) && (child.userData.isFrontPanel || child.userData.isCornerFront))
                     );
                     if (isFrontMat) {
+                        child.receiveShadow = false;
+                        mat.polygonOffset = true;
+                        mat.polygonOffsetFactor = -2;
+                        mat.polygonOffsetUnits = -4;
+
                         // Zapisz oryginalną fabryczną teksturę i kolor
                         if (!this.defaultFrontTextures.has(moduleData.id)) {
                             this.defaultFrontTextures.set(moduleData.id, {
@@ -442,6 +447,10 @@ export class BrandingManager {
                         (!Array.isArray(child.material) && (child.userData.isFrontPanel || child.userData.isCornerFront))
                     );
                     if (isFrontMat) {
+                        child.receiveShadow = false;
+                        mat.polygonOffset = true;
+                        mat.polygonOffsetFactor = -2;
+                        mat.polygonOffsetUnits = -4;
                         const def = this.defaultFrontTextures.get(moduleData.id);
                         mat.map = def ? (def.map || null) : null;
                         if (def && def.color) {

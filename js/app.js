@@ -57,7 +57,7 @@ class ArtbarApp {
 
         // Kamery: Perspektywiczna i Ortograficzna (Aksonometryczna / Ortho pod kątem)
         const aspect = window.innerWidth / window.innerHeight;
-        this.perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.1, 200);
+        this.perspCamera = new THREE.PerspectiveCamera(45, aspect, 0.2, 100);
         this.perspCamera.position.set(0, 6.5, 9.5);
 
         this.orthoFrustumSize = 8.5;
@@ -66,8 +66,8 @@ class ArtbarApp {
             this.orthoFrustumSize * aspect / 2,
             this.orthoFrustumSize / 2,
             -this.orthoFrustumSize / 2,
-            0.1,
-            200
+            0.2,
+            100
         );
         this.orthoCamera.position.set(10, 8.5, 10);
         this.orthoCamera.lookAt(0, 0.5, 0);
@@ -79,8 +79,7 @@ class ArtbarApp {
         this.renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
             antialias: true,
-            powerPreference: 'high-performance',
-            logarithmicDepthBuffer: true
+            powerPreference: 'high-performance'
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -92,7 +91,7 @@ class ArtbarApp {
         // Kontroler kamery OrbitControls
         this.controls = new OrbitControls(this.camera, this.canvas);
         this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.08;
+        this.controls.dampingFactor = 0.18;
         this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Nie pozwól zajrzeć pod podłogę
         this.controls.minDistance = 2.0;
         this.controls.maxDistance = 40.0;
@@ -160,7 +159,8 @@ class ArtbarApp {
         this.mainLight.shadow.camera.right = d;
         this.mainLight.shadow.camera.top = d;
         this.mainLight.shadow.camera.bottom = -d;
-        this.mainLight.shadow.bias = -0.0004;
+        this.mainLight.shadow.bias = -0.00005;
+        this.mainLight.shadow.normalBias = 0.02;
         this.updateMainLightPosition();
         this.scene.add(this.mainLight);
 

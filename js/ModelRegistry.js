@@ -146,9 +146,9 @@ export class ModelRegistry {
 
     async loadAllModels(onProgress) {
         const modelsToLoad = [
-            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb?v=5',     label: 'Moduł prosty baru' },
-            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=5',          label: 'Narożnik' },
-            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb?v=5',        label: 'Regał zaplecza' }
+            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb?v=6',     label: 'Moduł prosty baru' },
+            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=6',          label: 'Narożnik' },
+            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb?v=6',        label: 'Regał zaplecza' }
         ];
 
         let loadedCount = 0;
@@ -420,17 +420,21 @@ export class ModelRegistry {
     }
 
     setupShadowsAndMaterials(root, modelKey) {
+        // 1. Całkowicie usuń zduplikowaną w Blenderze planszę PLANSZA.001 (BarArt.001) z pliku BarModel.glb.
+        // PLANSZA.001 nakłada się w 100% na planszę właściwą PLANSZA.004 (BarArt.104), wywołując Z-fighting i gwałtowne drganie tekstur.
+        const duplicatesToRemove = [];
+        root.traverse(child => {
+            if (child.isMesh && child.name && (child.name.toLowerCase().includes('plansza.001') || child.name.toLowerCase().includes('barart.001'))) {
+                duplicatesToRemove.push(child);
+            }
+        });
+        duplicatesToRemove.forEach(c => {
+            if (c.parent) c.parent.remove(c);
+            if (c.geometry) c.geometry.dispose();
+        });
+
         root.traverse(child => {
             if (child.isMesh) {
-                // Całkowicie wyklucz zduplikowaną w Blenderze planszę PLANSZA.001 (BarArt.001) z pliku BarModel.glb.
-                // PLANSZA.001 nakłada się w 100% na planszę właściwą PLANSZA.004 (BarArt.104), wywołując Z-fighting i gwałtowne drganie tekstur.
-                if (child.name && (child.name.toLowerCase().includes('plansza.001') || child.name.toLowerCase().includes('barart.001'))) {
-                    child.visible = false;
-                    child.castShadow = false;
-                    child.receiveShadow = false;
-                    return;
-                }
-
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -447,22 +451,38 @@ export class ModelRegistry {
                 if (hasBrandingMat) {
                     child.userData.isFrontPanel = true;
                     child.userData.isCornerFront = true;
+                    child.receiveShadow = false;
                     mats.forEach(m => {
                         if (m && (m.name || '').toLowerCase().includes('branding')) {
                             m.name = 'front';
                             m.side = THREE.DoubleSide;
+                            m.polygonOffset = true;
+                            m.polygonOffsetFactor = -2;
+                            m.polygonOffsetUnits = -4;
                         }
                     });
                     this.normalizeCornerFrontUVs(child.geometry);
                 } else if (hasFrontMat) {
                     child.userData.isFrontPanel = true;
+                    child.receiveShadow = false;
+                    mats.forEach(m => {
+                        if (m) {
+                            m.polygonOffset = true;
+                            m.polygonOffsetFactor = -2;
+                            m.polygonOffsetUnits = -4;
+                        }
+                    });
                     this.normalizeFrontUVs(child.geometry);
                 } else if (isFrontBoard) {
                     child.userData.isFrontPanel = true;
+                    child.receiveShadow = false;
                     const origMat = mats[0];
                     const frontMat = origMat.clone();
                     frontMat.name = 'front';
                     frontMat.side = THREE.DoubleSide;
+                    frontMat.polygonOffset = true;
+                    frontMat.polygonOffsetFactor = -2;
+                    frontMat.polygonOffsetUnits = -4;
                     origMat.name = 'frame';
                     origMat.side = THREE.DoubleSide;
 
@@ -480,10 +500,14 @@ export class ModelRegistry {
                 } else if (isLegacyCornerMesh) {
                     child.userData.isFrontPanel = true;
                     child.userData.isCornerFront = true;
+                    child.receiveShadow = false;
                     const origMat = mats[0];
                     const frontMat = origMat.clone();
                     frontMat.name = 'front';
                     frontMat.side = THREE.DoubleSide;
+                    frontMat.polygonOffset = true;
+                    frontMat.polygonOffsetFactor = -2;
+                    frontMat.polygonOffsetUnits = -4;
                     origMat.name = 'frame';
 
                     // W siatce BarArt.002 z 747 indeksami (249 trójkątów):
@@ -496,6 +520,10 @@ export class ModelRegistry {
                     child.geometry.addGroup(741, 6, 0);  // Grupa 2: wewnętrzna ścianka -> 'frame'
                     child.material = [origMat, frontMat];
                     this.normalizeCornerFrontUVs(child.geometry);
+                }
+
+                if (child.userData.isFrontPanel) {
+                    child.receiveShadow = false;
                 }
 
                 // Oznacz siatki frontowe dla brandingu
@@ -519,8 +547,8 @@ export class ModelRegistry {
                 }
 
                 if (child.material) {
-                    const mats = Array.isArray(child.material) ? child.material : [child.material];
-                    mats.forEach(m => {
+                    const allMats = Array.isArray(child.material) ? child.material : [child.material];
+                    allMats.forEach(m => {
                         m.side = THREE.DoubleSide;
                         if (m.map) {
                             m.map.anisotropy = 8;
