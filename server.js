@@ -104,6 +104,62 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // Transparentne proxy dla lokalnego ComfyUI (http://127.0.0.1:8188) bez problemów z CORS
+    if (reqPath.startsWith('/api/comfyui/')) {
+        const subPath = req.url.replace(/^\/api\/comfyui\//, '');
+        const targetUrl = new URL(`http://127.0.0.1:8188/${subPath}`);
+
+        const proxyReq = http.request({
+            hostname: targetUrl.hostname,
+            port: targetUrl.port,
+            path: targetUrl.pathname + targetUrl.search,
+            method: req.method,
+            headers: {
+                ...req.headers,
+                host: `${targetUrl.hostname}:${targetUrl.port}`
+            }
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: `ComfyUI nie odpowiada na ${targetUrl.origin}: ${err.message}` }));
+        });
+
+        req.pipe(proxyReq);
+        return;
+    }
+
+    // Transparentne proxy dla lokalnego AUTOMATIC1111 (http://127.0.0.1:7860) bez problemów z CORS
+    if (reqPath.startsWith('/api/sd/')) {
+        const subPath = req.url.replace(/^\/api\/sd\//, '');
+        const targetUrl = new URL(`http://127.0.0.1:7860/${subPath}`);
+
+        const proxyReq = http.request({
+            hostname: targetUrl.hostname,
+            port: targetUrl.port,
+            path: targetUrl.pathname + targetUrl.search,
+            method: req.method,
+            headers: {
+                ...req.headers,
+                host: `${targetUrl.hostname}:${targetUrl.port}`
+            }
+        }, (proxyRes) => {
+            res.writeHead(proxyRes.statusCode, proxyRes.headers);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: `AUTOMATIC1111 nie odpowiada na ${targetUrl.origin}: ${err.message}` }));
+        });
+
+        req.pipe(proxyReq);
+        return;
+    }
+
     if (reqPath === '/') reqPath = '/index.html';
     
     const filePath = path.join(ROOT, reqPath);

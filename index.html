@@ -320,18 +320,30 @@
                         <div class="ai-setting-row">
                             <label class="ai-setting-label">Źródło AI:</label>
                             <select id="ai-select-provider" class="scene-select">
+                                <option value="comfyui">Lokalne ComfyUI (GPU - http://127.0.0.1:8188)</option>
+                                <option value="cloud">Stability AI Chmura (SDXL / SD 3.5)</option>
+                                <option value="automatic1111">Lokalny AUTOMATIC1111 (http://127.0.0.1:7860)</option>
                                 <option value="demo">Szybki Tryb Demo (bez kluczy)</option>
-                                <option value="cloud">Stability AI Chmura (SDXL API)</option>
-                                <option value="local">Lokalny AUTOMATIC1111 (GPU)</option>
+                            </select>
+                        </div>
+                        <div class="ai-setting-row" id="ai-row-comfy-url">
+                            <label class="ai-setting-label">Adres ComfyUI:</label>
+                            <input type="text" id="ai-input-comfy-url" value="http://127.0.0.1:8188" class="ai-input-text">
+                            <span class="ai-hint-small">Uruchom ComfyUI z flagą --listen 127.0.0.1 --port 8188</span>
+                        </div>
+                        <div class="ai-setting-row" id="ai-row-comfy-ckpt">
+                            <label class="ai-setting-label">Model Checkpoint ComfyUI:</label>
+                            <select id="ai-select-comfy-ckpt" class="scene-select">
+                                <option value="">(Wykrywanie zainstalowanych modeli...)</option>
                             </select>
                         </div>
                         <div class="ai-setting-row" id="ai-row-cloud-key" style="display: none;">
                             <label class="ai-setting-label">Klucz Stability API:</label>
                             <input type="password" id="ai-input-api-key" placeholder="sk-..." class="ai-input-text" autocomplete="off">
-                            <span class="ai-hint-small">Zapisywany tylko lokalnie w przeglądarce.</span>
+                            <span class="ai-hint-small">Dla wdrożenia w chmurze u klienta (zapisywany lokalnie).</span>
                         </div>
                         <div class="ai-setting-row" id="ai-row-local-url" style="display: none;">
-                            <label class="ai-setting-label">Adres lokalnego WebUI:</label>
+                            <label class="ai-setting-label">Adres AUTOMATIC1111 WebUI:</label>
                             <input type="text" id="ai-input-local-url" value="http://127.0.0.1:7860" class="ai-input-text">
                             <span class="ai-hint-small">Uruchom: webui-user.bat --api --cors-allow-origins="*"</span>
                         </div>
@@ -353,8 +365,11 @@
                             <span>Wzór bezszwowy (Seamless tile)</span>
                         </label>
                         <select id="ai-select-aspect" class="scene-select" style="width: auto; padding: 2px 6px; font-size: 0.70rem;">
-                            <option value="panorama">Panorama (1536×640)</option>
-                            <option value="square">Kwadrat (1024×1024)</option>
+                            <option value="bar_1x">1 Moduł Baru (1.5m × 0.95m - 1216×768) [Zalecany]</option>
+                            <option value="bar_1x_hd">1 Moduł Baru HD (1536×960)</option>
+                            <option value="bar_2x">Podwójny Bar (3.0m - 1536×480)</option>
+                            <option value="bar_3x">Potrójny Bar (4.5m - 1536×320)</option>
+                            <option value="square">Kwadrat (1:1 - 1024×1024)</option>
                         </select>
                     </div>
 

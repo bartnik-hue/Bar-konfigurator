@@ -1,6 +1,10 @@
 /**
  * AiTextureService.js
- * Moduł generowania teł i tekstur frontów barowych z wykorzystaniem Stable Diffusion (Chmura, Lokalne WebUI lub Tryb Demonstracyjny).
+ * Moduł generowania teł i tekstur frontów barowych z wykorzystaniem:
+ * 1. ComfyUI (Lokalne API na http://127.0.0.1:8188 z obsługą proxy)
+ * 2. Stability AI Cloud API (SDXL / SD 3.5 w chmurze - model BYOK)
+ * 3. AUTOMATIC1111 WebUI (Lokalne API na http://127.0.0.1:7860)
+ * 4. Szybki tryb demonstracyjny / proceduralny
  */
 
 export const AI_STYLE_PRESETS = [
@@ -60,25 +64,36 @@ export const AI_STYLE_PRESETS = [
     }
 ];
 
+export const ARTBAR_ASPECT_RATIOS = [
+    { id: 'bar_1x', name: '1 Moduł Baru (1.5m × 0.95m - 1216×768) [Zalecany]', width: 1216, height: 768, spanModules: 1 },
+    { id: 'bar_1x_hd', name: '1 Moduł Baru HD (1.5m × 0.95m - 1536×960)', width: 1536, height: 960, spanModules: 1 },
+    { id: 'bar_2x', name: 'Podwójny Bar (3.0m × 0.95m - 1536×480)', width: 1536, height: 480, spanModules: 2 },
+    { id: 'bar_3x', name: 'Potrójny Bar (4.5m × 0.95m - 1536×320)', width: 1536, height: 320, spanModules: 3 },
+    { id: 'square', name: 'Kwadrat Bezszwowy (1:1 - 1024×1024)', width: 1024, height: 1024, spanModules: 1 }
+];
+
 export class AiTextureService {
     constructor() {
-        this.provider = localStorage.getItem('artbar_ai_provider') || 'demo'; // 'demo' | 'cloud' | 'local'
+        this.provider = localStorage.getItem('artbar_ai_provider') || 'comfyui'; // 'comfyui' | 'cloud' | 'automatic1111' | 'demo'
         this.stabilityApiKey = localStorage.getItem('artbar_stability_key') || '';
+        this.comfyUiUrl = localStorage.getItem('artbar_comfyui_url') || 'http://127.0.0.1:8188';
+        this.comfyUiCheckpoint = localStorage.getItem('artbar_comfyui_ckpt') || '';
         this.localWebUiUrl = localStorage.getItem('artbar_local_sd_url') || 'http://127.0.0.1:7860';
         
         this.activeStyleId = 'marble_gold';
         this.isSeamless = true;
-        this.aspectRatio = 'panorama'; // 'panorama' (1536x640) | 'square' (1024x1024)
+        this.aspectRatioId = 'bar_1x';
         
         this.history = [];
         this.currentResult = null;
         this.isGenerating = false;
+        this.cachedCheckpoints = [];
         
         this.onStatusUpdate = null;
     }
 
     setProvider(provider) {
-        if (['demo', 'cloud', 'local'].includes(provider)) {
+        if (['comfyui', 'cloud', 'automatic1111', 'demo'].includes(provider)) {
             this.provider = provider;
             localStorage.setItem('artbar_ai_provider', provider);
         }
@@ -87,6 +102,16 @@ export class AiTextureService {
     setApiKey(key) {
         this.stabilityApiKey = (key || '').trim();
         localStorage.setItem('artbar_stability_key', this.stabilityApiKey);
+    }
+
+    setComfyUiUrl(url) {
+        this.comfyUiUrl = (url || '').trim() || 'http://127.0.0.1:8188';
+        localStorage.setItem('artbar_comfyui_url', this.comfyUiUrl);
+    }
+
+    setComfyUiCheckpoint(ckpt) {
+        this.comfyUiCheckpoint = (ckpt || '').trim();
+        localStorage.setItem('artbar_comfyui_ckpt', this.comfyUiCheckpoint);
     }
 
     setLocalUrl(url) {
@@ -99,6 +124,18 @@ export class AiTextureService {
         if (found) {
             this.activeStyleId = styleId;
         }
+    }
+
+    setAspectRatio(id) {
+        const found = ARTBAR_ASPECT_RATIOS.find(r => r.id === id);
+        if (found) {
+            this.aspectRatioId = id;
+        }
+    }
+
+    getDimensions() {
+        const found = ARTBAR_ASPECT_RATIOS.find(r => r.id === this.aspectRatioId) || ARTBAR_ASPECT_RATIOS[0];
+        return { width: found.width, height: found.height, spanModules: found.spanModules };
     }
 
     /**
@@ -127,7 +164,38 @@ export class AiTextureService {
     }
 
     /**
-     * Główna metoda wywołująca generację w wybranym źródle (Chmura, Lokalne SD lub Demo)
+     * Sprawdza dostępność ComfyUI i pobiera listę zainstalowanych modeli checkpoint
+     */
+    async fetchComfyUiCheckpoints() {
+        // Próba przez lokalne proxy serwera lub bezpośrednio
+        const endpoints = [
+            '/api/comfyui/object_info/CheckpointLoaderSimple',
+            `${this.comfyUiUrl.replace(/\/+$/, '')}/object_info/CheckpointLoaderSimple`
+        ];
+
+        for (const ep of endpoints) {
+            try {
+                const res = await fetch(ep, { method: 'GET', headers: { 'Accept': 'application/json' } });
+                if (res.ok) {
+                    const data = await res.json();
+                    const ckpts = data?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0];
+                    if (Array.isArray(ckpts) && ckpts.length > 0) {
+                        this.cachedCheckpoints = ckpts;
+                        if (!this.comfyUiCheckpoint || !ckpts.includes(this.comfyUiCheckpoint)) {
+                            this.setComfyUiCheckpoint(ckpts[0]);
+                        }
+                        return ckpts;
+                    }
+                }
+            } catch (e) {
+                // ignoruj błąd endpointa i sprawdź następny
+            }
+        }
+        return this.cachedCheckpoints;
+    }
+
+    /**
+     * Główna metoda wywołująca generację w wybranym silniku
      */
     async generateTexture(userPrompt = '') {
         if (this.isGenerating) {
@@ -138,17 +206,20 @@ export class AiTextureService {
         this.notifyStatus('Inicjalizacja generowania grafiki AI...', 10);
 
         const { positive, negative } = this.buildPrompts(userPrompt);
+        const dims = this.getDimensions();
 
         try {
             let dataUrl = null;
 
-            if (this.provider === 'cloud') {
-                dataUrl = await this.generateCloudStability(positive, negative);
-            } else if (this.provider === 'local') {
-                dataUrl = await this.generateLocalWebUi(positive, negative);
+            if (this.provider === 'comfyui') {
+                dataUrl = await this.generateComfyUi(positive, negative, dims);
+            } else if (this.provider === 'cloud') {
+                dataUrl = await this.generateCloudStability(positive, negative, dims);
+            } else if (this.provider === 'automatic1111') {
+                dataUrl = await this.generateLocalWebUi(positive, negative, dims);
             } else {
-                // Tryb Demonstracyjny / Proceduralny (nie wymaga kluczy ani GPU)
-                dataUrl = await this.generateProceduralDemo(userPrompt, positive);
+                // Tryb Demonstracyjny / Proceduralny (szybki test bez kluczy i bez GPU)
+                dataUrl = await this.generateProceduralDemo(userPrompt, positive, dims);
             }
 
             const result = {
@@ -156,7 +227,8 @@ export class AiTextureService {
                 prompt: userPrompt || (AI_STYLE_PRESETS.find(s => s.id === this.activeStyleId)?.name || 'Custom'),
                 styleId: this.activeStyleId,
                 isSeamless: this.isSeamless,
-                aspectRatio: this.aspectRatio,
+                aspectRatioId: this.aspectRatioId,
+                spanModules: dims.spanModules,
                 provider: this.provider,
                 timestamp: Date.now()
             };
@@ -175,17 +247,178 @@ export class AiTextureService {
     }
 
     /**
+     * Generacja poprzez lokalne API ComfyUI (http://127.0.0.1:8188)
+     */
+    async generateComfyUi(positivePrompt, negativePrompt, dims) {
+        this.notifyStatus(`Sprawdzanie połączenia z ComfyUI...`, 20);
+
+        // Pobierz aktualną listę modeli jeśli jeszcze nie pobrano
+        let ckpts = this.cachedCheckpoints;
+        if (!ckpts || ckpts.length === 0) {
+            ckpts = await this.fetchComfyUiCheckpoints();
+        }
+
+        const ckptName = this.comfyUiCheckpoint || (ckpts.length > 0 ? ckpts[0] : 'v1-5-pruned-emaonly.safetensors');
+        const seed = Math.floor(Math.random() * 1000000000000);
+        const clientId = 'artbar_' + Date.now();
+
+        // Standardowy graf Text-To-Image dla ComfyUI
+        const promptGraph = {
+            "3": {
+                "inputs": {
+                    "seed": seed,
+                    "steps": 25,
+                    "cfg": 7.0,
+                    "sampler_name": "euler_ancestral",
+                    "scheduler": "karras",
+                    "denoise": 1.0,
+                    "model": ["4", 0],
+                    "positive": ["6", 0],
+                    "negative": ["7", 0],
+                    "latent_image": ["5", 0]
+                },
+                "class_type": "KSampler"
+            },
+            "4": {
+                "inputs": {
+                    "ckpt_name": ckptName
+                },
+                "class_type": "CheckpointLoaderSimple"
+            },
+            "5": {
+                "inputs": {
+                    "width": dims.width,
+                    "height": dims.height,
+                    "batch_size": 1
+                },
+                "class_type": "EmptyLatentImage"
+            },
+            "6": {
+                "inputs": {
+                    "text": positivePrompt,
+                    "clip": ["4", 1]
+                },
+                "class_type": "CLIPTextEncode"
+            },
+            "7": {
+                "inputs": {
+                    "text": negativePrompt,
+                    "clip": ["4", 1]
+                },
+                "class_type": "CLIPTextEncode"
+            },
+            "8": {
+                "inputs": {
+                    "samples": ["3", 0],
+                    "vae": ["4", 2]
+                },
+                "class_type": "VAEDecode"
+            },
+            "9": {
+                "inputs": {
+                    "filename_prefix": "Artbar_Front",
+                    "images": ["8", 0]
+                },
+                "class_type": "SaveImage"
+            }
+        };
+
+        const postBody = JSON.stringify({ prompt: promptGraph, client_id: clientId });
+
+        // Endpointy do wysłania promptu (preferuj proxy serwera localhost:3050/api/comfyui, potem direct)
+        const promptUrls = [
+            '/api/comfyui/prompt',
+            `${this.comfyUiUrl.replace(/\/+$/, '')}/prompt`
+        ];
+
+        let promptId = null;
+        let activePrefix = '';
+
+        for (const url of promptUrls) {
+            try {
+                this.notifyStatus('Wysyłanie zadania do ComfyUI...', 35);
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: postBody
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.prompt_id) {
+                        promptId = data.prompt_id;
+                        activePrefix = url.startsWith('/api/comfyui') ? '/api/comfyui' : this.comfyUiUrl.replace(/\/+$/, '');
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (!promptId) {
+            throw new Error(`Nie udało się połączyć z ComfyUI (${this.comfyUiUrl}). Upewnij się, że ComfyUI jest uruchomione na Twoim komputerze.`);
+        }
+
+        // Odpytywanie o wynik generowania (polling historii)
+        this.notifyStatus('Generowanie obrazu w ComfyUI na GPU...', 50);
+        let outputImageInfo = null;
+        const maxAttempts = 120; // 60 sekund maks
+        let attempt = 0;
+
+        while (attempt < maxAttempts) {
+            await new Promise(r => setTimeout(r, 600));
+            attempt++;
+            
+            const progressPct = Math.min(90, 50 + Math.round((attempt / 40) * 40));
+            this.notifyStatus(`Generowanie na karcie GPU w toku (${attempt * 0.6}s)...`, progressPct);
+
+            try {
+                const historyUrl = `${activePrefix}/history/${promptId}`;
+                const hRes = await fetch(historyUrl);
+                if (hRes.ok) {
+                    const hData = await hRes.json();
+                    if (hData && hData[promptId] && hData[promptId].outputs) {
+                        const outputs = hData[promptId].outputs;
+                        // Szukamy węzła SaveImage (id "9")
+                        if (outputs["9"] && outputs["9"].images && outputs["9"].images.length > 0) {
+                            outputImageInfo = outputs["9"].images[0];
+                            break;
+                        }
+                    }
+                }
+            } catch (pollErr) {}
+        }
+
+        if (!outputImageInfo) {
+            throw new Error('ComfyUI: przekroczono limit czasu oczekiwania na zakończenie generacji.');
+        }
+
+        // Pobranie wygenerowanego pliku
+        this.notifyStatus('Pobieranie gotowego obrazu z ComfyUI...', 92);
+        const viewUrl = `${activePrefix}/view?filename=${encodeURIComponent(outputImageInfo.filename)}&subfolder=${encodeURIComponent(outputImageInfo.subfolder || '')}&type=${encodeURIComponent(outputImageInfo.type || 'output')}`;
+        
+        const imgRes = await fetch(viewUrl);
+        if (!imgRes.ok) {
+            throw new Error(`ComfyUI: błąd pobierania obrazu (${imgRes.status}).`);
+        }
+
+        const blob = await imgRes.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Błąd odczytu pliku z ComfyUI.'));
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    /**
      * Generacja przez Stability AI Cloud REST API (SDXL)
      */
-    async generateCloudStability(positivePrompt, negativePrompt) {
+    async generateCloudStability(positivePrompt, negativePrompt, dims) {
         if (!this.stabilityApiKey) {
-            throw new Error('Brak klucza Stability AI API. Wprowadź klucz w ustawieniach lub przełącz na tryb Demo / Lokalne SD.');
+            throw new Error('Brak klucza Stability AI API. Wprowadź klucz w ustawieniach (ikona ⚙) lub wybierz ComfyUI / Demo.');
         }
 
         this.notifyStatus('Łączenie z chmurą Stability AI (SDXL)...', 30);
-
-        const width = this.aspectRatio === 'panorama' ? 1536 : 1024;
-        const height = this.aspectRatio === 'panorama' ? 640 : 1024;
 
         const url = 'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image';
         
@@ -195,8 +428,8 @@ export class AiTextureService {
                 { text: negativePrompt, weight: -1.0 }
             ],
             cfg_scale: 7.5,
-            height: height,
-            width: width,
+            height: dims.height,
+            width: dims.width,
             samples: 1,
             steps: 30
         };
@@ -232,22 +465,22 @@ export class AiTextureService {
     }
 
     /**
-     * Generacja przez Lokalne AUTOMATIC1111 / ComfyUI WebUI
+     * Generacja przez Lokalne AUTOMATIC1111 WebUI
      */
-    async generateLocalWebUi(positivePrompt, negativePrompt) {
+    async generateLocalWebUi(positivePrompt, negativePrompt, dims) {
         this.notifyStatus(`Łączenie z lokalnym WebUI (${this.localWebUiUrl})...`, 25);
 
-        const width = this.aspectRatio === 'panorama' ? 1536 : 1024;
-        const height = this.aspectRatio === 'panorama' ? 640 : 1024;
-
-        const endpoint = `${this.localWebUiUrl.replace(/\/+$/, '')}/sdapi/v1/txt2img`;
+        const endpoints = [
+            '/api/sd/sdapi/v1/txt2img',
+            `${this.localWebUiUrl.replace(/\/+$/, '')}/sdapi/v1/txt2img`
+        ];
 
         const payload = {
             prompt: positivePrompt,
             negative_prompt: negativePrompt,
             tiling: this.isSeamless,
-            width: width,
-            height: height,
+            width: dims.width,
+            height: dims.height,
             steps: 25,
             cfg_scale: 7.0,
             sampler_name: 'DPM++ 2M Karras'
@@ -255,38 +488,35 @@ export class AiTextureService {
 
         this.notifyStatus('Generowanie obrazu na karcie graficznej GPU...', 55);
 
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        for (const ep of endpoints) {
+            try {
+                const res = await fetch(ep, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-            if (!res.ok) {
-                throw new Error(`Lokalne WebUI zwróciło błąd HTTP ${res.status}`);
-            }
-
-            const data = await res.json();
-            if (!data.images || data.images.length === 0) {
-                throw new Error('Brak obrazu w odpowiedzi lokalnego WebUI.');
-            }
-
-            return `data:image/png;base64,${data.images[0]}`;
-        } catch (netErr) {
-            throw new Error(`Nie udało się połączyć z ${this.localWebUiUrl}. Upewnij się, że WebUI jest uruchomione z flagą --api --cors-allow-origins="*".`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.images && data.images.length > 0) {
+                        return `data:image/png;base64,${data.images[0]}`;
+                    }
+                }
+            } catch (e) {}
         }
+
+        throw new Error(`Nie udało się połączyć z AUTOMATIC1111 na ${this.localWebUiUrl}. Upewnij się, że uruchomiono z flagą --api.`);
     }
 
     /**
      * Szybki i fotorealistyczny generator proceduralny w trybie demonstracyjnym.
-     * Umożliwia natychmiastowe testowanie układu 3D, bezszwowego zapętlania i wariantów kolorystycznych bez kluczy API.
      */
-    async generateProceduralDemo(userPrompt = '', positivePrompt = '') {
+    async generateProceduralDemo(userPrompt = '', positivePrompt = '', dims) {
         this.notifyStatus('Generowanie wariantu tła demonstracyjnego...', 40);
-        await new Promise(r => setTimeout(r, 600)); // Przyjemne wrażenie pracy silnika
+        await new Promise(r => setTimeout(r, 600));
 
-        const width = this.aspectRatio === 'panorama' ? 1536 : 1024;
-        const height = this.aspectRatio === 'panorama' ? 640 : 1024;
+        const width = dims.width;
+        const height = dims.height;
 
         const canvas = document.createElement('canvas');
         canvas.width = width;
@@ -328,7 +558,7 @@ export class AiTextureService {
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, width, height);
 
-        // 2. Proceduralne organiczne fale i żyłki (Simulated AI fluid/marble)
+        // 2. Fale i żyłki
         const waveCount = styleId === 'art_deco' ? 14 : 9;
         ctx.save();
         for (let i = 0; i < waveCount; i++) {
@@ -356,7 +586,6 @@ export class AiTextureService {
                 ctx.lineWidth = 2.5;
                 ctx.stroke();
             } else {
-                // Marble & Fluid: złote żyłki i światło
                 ctx.strokeStyle = `rgba(250, 203, 125, ${0.25 + (i % 4) * 0.18})`;
                 ctx.lineWidth = 1.2 + (i % 3) * 1.6;
                 ctx.stroke();
@@ -364,7 +593,7 @@ export class AiTextureService {
         }
         ctx.restore();
 
-        // 3. Dodatkowa warstwa detalu: złoty pył (speckles) lub mikro-geometria
+        // 3. Detale: złoty pył
         ctx.save();
         const dotCount = 180;
         for (let d = 0; d < dotCount; d++) {
@@ -378,18 +607,16 @@ export class AiTextureService {
         }
         ctx.restore();
 
-        // 4. Jeśli włączony bezszwowy tiling - wygładzamy krawędzie boczne
+        // 4. Bezszwowy blend krawędzi
         if (this.isSeamless) {
-            // Płynne przenikanie lewej i prawej krawędzi (seamless border blend)
             const blendW = 60;
             const leftData = ctx.getImageData(0, 0, blendW, height);
             const rightData = ctx.getImageData(width - blendW, 0, blendW, height);
             
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < blendW; x++) {
-                    const factor = x / blendW; // 0 przy lewej, 1 w głębi
+                    const factor = x / blendW;
                     const idx = (y * blendW + x) * 4;
-                    // Proporcjonalne zbalansowanie kanałów barwnych
                     leftData.data[idx] = Math.round(leftData.data[idx] * factor + rightData.data[idx] * (1 - factor));
                     leftData.data[idx + 1] = Math.round(leftData.data[idx + 1] * factor + rightData.data[idx + 1] * (1 - factor));
                     leftData.data[idx + 2] = Math.round(leftData.data[idx + 2] * factor + rightData.data[idx + 2] * (1 - factor));
@@ -403,7 +630,6 @@ export class AiTextureService {
     }
 
     addToHistory(item) {
-        // Dodajemy na początek, trzymamy maks. 8 ostatnich grafik
         this.history.unshift(item);
         if (this.history.length > 8) {
             this.history.pop();

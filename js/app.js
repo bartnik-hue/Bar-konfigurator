@@ -781,6 +781,9 @@ class ArtbarApp {
 
                     if (savedSettings) {
                         this.brandingManager.applySettings(savedSettings);
+                        if (savedSettings.background && savedSettings.background.aiMetadata && savedSettings.background.url) {
+                            this.restoreAiGeneratorFromProject(savedSettings.background.aiMetadata, savedSettings.background.url);
+                        }
                     }
 
                     if (savedLedSettings) {
@@ -1521,23 +1524,60 @@ class ArtbarApp {
         const btnToggleSettings = document.getElementById('btn-ai-toggle-settings');
         const settingsPanel = document.getElementById('ai-settings-panel');
         const selectProvider = document.getElementById('ai-select-provider');
+        
+        // ComfyUI elementy
+        const rowComfyUrl = document.getElementById('ai-row-comfy-url');
+        const inputComfyUrl = document.getElementById('ai-input-comfy-url');
+        const rowComfyCkpt = document.getElementById('ai-row-comfy-ckpt');
+        const selectComfyCkpt = document.getElementById('ai-select-comfy-ckpt');
+
+        // Chmura i SD WebUI
         const rowCloudKey = document.getElementById('ai-row-cloud-key');
         const inputApiKey = document.getElementById('ai-input-api-key');
         const rowLocalUrl = document.getElementById('ai-row-local-url');
         const inputLocalUrl = document.getElementById('ai-input-local-url');
+        
         const toggleSeamless = document.getElementById('ai-toggle-seamless');
         const selectAspect = document.getElementById('ai-select-aspect');
+
+        const updateProviderRows = (prov) => {
+            if (rowComfyUrl) rowComfyUrl.style.display = prov === 'comfyui' ? 'flex' : 'none';
+            if (rowComfyCkpt) rowComfyCkpt.style.display = prov === 'comfyui' ? 'flex' : 'none';
+            if (rowCloudKey) rowCloudKey.style.display = prov === 'cloud' ? 'flex' : 'none';
+            if (rowLocalUrl) rowLocalUrl.style.display = prov === 'automatic1111' ? 'flex' : 'none';
+        };
+
+        const loadComfyCheckpoints = async () => {
+            if (!selectComfyCkpt) return;
+            selectComfyCkpt.innerHTML = '<option value="">(Wyszukiwanie modeli na ComfyUI...)</option>';
+            const ckpts = await this.aiTextureService.fetchComfyUiCheckpoints();
+            if (ckpts && ckpts.length > 0) {
+                selectComfyCkpt.innerHTML = '';
+                ckpts.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === this.aiTextureService.comfyUiCheckpoint) opt.selected = true;
+                    selectComfyCkpt.appendChild(opt);
+                });
+            } else {
+                selectComfyCkpt.innerHTML = '<option value="">(Uruchom ComfyUI i kliknij Zębatkę ponownie)</option>';
+            }
+        };
 
         // Inicjalizacja pól ustawień z AiTextureService
         if (selectProvider) {
             selectProvider.value = this.aiTextureService.provider;
-            if (rowCloudKey) rowCloudKey.style.display = this.aiTextureService.provider === 'cloud' ? 'flex' : 'none';
-            if (rowLocalUrl) rowLocalUrl.style.display = this.aiTextureService.provider === 'local' ? 'flex' : 'none';
+            updateProviderRows(this.aiTextureService.provider);
+            if (this.aiTextureService.provider === 'comfyui') {
+                loadComfyCheckpoints();
+            }
         }
+        if (inputComfyUrl) inputComfyUrl.value = this.aiTextureService.comfyUiUrl;
         if (inputApiKey) inputApiKey.value = this.aiTextureService.stabilityApiKey;
         if (inputLocalUrl) inputLocalUrl.value = this.aiTextureService.localWebUiUrl;
         if (toggleSeamless) toggleSeamless.checked = this.aiTextureService.isSeamless;
-        if (selectAspect) selectAspect.value = this.aiTextureService.aspectRatio;
+        if (selectAspect) selectAspect.value = this.aiTextureService.aspectRatioId;
 
         // Renderowanie kafelków stylów architektonicznych
         if (stylesContainer) {
@@ -1565,24 +1605,36 @@ class ArtbarApp {
             const isOpen = settingsPanel.style.display === 'flex';
             settingsPanel.style.display = isOpen ? 'none' : 'flex';
             btnToggleSettings.classList.toggle('active', !isOpen);
+            if (!isOpen && this.aiTextureService.provider === 'comfyui') {
+                loadComfyCheckpoints();
+            }
         });
 
-        // Zmiana dostawcy (Demo / Cloud / Local)
+        // Zmiana dostawcy (ComfyUI / Cloud / Automatic1111 / Demo)
         selectProvider?.addEventListener('change', (e) => {
             const prov = e.target.value;
             this.aiTextureService.setProvider(prov);
-            if (rowCloudKey) rowCloudKey.style.display = prov === 'cloud' ? 'flex' : 'none';
-            if (rowLocalUrl) rowLocalUrl.style.display = prov === 'local' ? 'flex' : 'none';
-            if (prov === 'cloud') {
+            updateProviderRows(prov);
+
+            if (prov === 'comfyui') {
+                loadComfyCheckpoints();
+                this.showToast('Wybrano lokalne ComfyUI (GPU - http://127.0.0.1:8188).');
+            } else if (prov === 'cloud') {
                 this.showToast('Wybrano chmurę Stability AI (SDXL). Wprowadź klucz API.');
-            } else if (prov === 'local') {
+            } else if (prov === 'automatic1111') {
                 this.showToast('Wybrano lokalne WebUI AUTOMATIC1111 (http://127.0.0.1:7860).');
             } else {
                 this.showToast('Wybrano szybki tryb demonstracyjny (nie wymaga kluczy ani GPU).');
             }
         });
 
-        // Zapis klucza i adresu
+        // Zapis wartości konfiguracyjnych
+        inputComfyUrl?.addEventListener('input', (e) => {
+            this.aiTextureService.setComfyUiUrl(e.target.value);
+        });
+        selectComfyCkpt?.addEventListener('change', (e) => {
+            this.aiTextureService.setComfyUiCheckpoint(e.target.value);
+        });
         inputApiKey?.addEventListener('input', (e) => {
             this.aiTextureService.setApiKey(e.target.value);
         });
@@ -1595,7 +1647,7 @@ class ArtbarApp {
             this.aiTextureService.isSeamless = e.target.checked;
         });
         selectAspect?.addEventListener('change', (e) => {
-            this.aiTextureService.aspectRatio = e.target.value;
+            this.aiTextureService.setAspectRatio(e.target.value);
         });
 
         // Wskaźnik postępu
@@ -1634,6 +1686,37 @@ class ArtbarApp {
             });
         };
 
+        // Metoda przywracająca stan generatora AI przy wczytaniu pliku projektu .json
+        this.restoreAiGeneratorFromProject = (aiMeta, dataUrl) => {
+            if (!aiMeta || !dataUrl) return;
+            const item = {
+                dataUrl: dataUrl,
+                prompt: aiMeta.prompt || 'Projekt Artbar AI',
+                styleId: aiMeta.styleId || 'marble_gold',
+                isSeamless: aiMeta.isSeamless !== false,
+                aspectRatioId: aiMeta.aspectRatioId || 'bar_1x',
+                spanModules: aiMeta.spanModules || 1,
+                provider: aiMeta.provider || 'comfyui',
+                timestamp: aiMeta.timestamp || Date.now()
+            };
+            this.aiTextureService.currentResult = item;
+            this.aiTextureService.addToHistory(item);
+            if (previewImg) previewImg.src = dataUrl;
+            if (previewBox) previewBox.style.display = 'flex';
+            if (promptInput && aiMeta.prompt) promptInput.value = aiMeta.prompt;
+            if (aiMeta.styleId) {
+                this.aiTextureService.setStyle(aiMeta.styleId);
+                stylesContainer?.querySelectorAll('.ai-style-card').forEach(c => {
+                    c.classList.toggle('active', c.dataset.styleId === aiMeta.styleId);
+                });
+            }
+            if (aiMeta.aspectRatioId && selectAspect) {
+                selectAspect.value = aiMeta.aspectRatioId;
+                this.aiTextureService.setAspectRatio(aiMeta.aspectRatioId);
+            }
+            renderHistory();
+        };
+
         const doGenerate = async () => {
             if (this.aiTextureService.isGenerating) return;
 
@@ -1655,10 +1738,19 @@ class ArtbarApp {
                     const toggle = document.getElementById('toggle-panorama-enable');
                     if (toggle && !toggle.checked) toggle.checked = true;
                     document.querySelectorAll('.panorama-card').forEach(c => c.classList.remove('active'));
+                    
+                    // Dopasuj długość fali/modułów do wybranej proporcji (1 moduł, 2 moduły lub 3 moduły)
+                    if (result.spanModules) {
+                        this.brandingManager.setBackgroundSpan(result.spanModules);
+                        const sliderSpan = document.getElementById('slider-panorama-span');
+                        const valSpan = document.getElementById('val-panorama-span');
+                        if (sliderSpan) sliderSpan.value = result.spanModules;
+                        if (valSpan) valSpan.textContent = `${result.spanModules} barów (${(result.spanModules * 1.5).toFixed(1)} m)`;
+                    }
                 });
 
                 renderHistory();
-                this.showToast('Tło AI zostało pomyślnie nałożone na bary 3D!');
+                this.showToast('Tło AI zostało pomyślnie wygenerowane i nałożone na bary 3D!');
             } catch (err) {
                 console.error('Błąd generacji AI:', err);
                 this.showToast(`Błąd generacji AI: ${err.message}`);
