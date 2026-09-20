@@ -845,7 +845,6 @@ class ArtbarApp {
         this.setupSidePanel('btn-open-scene-settings', 'panel-scene-settings');
         this.setupSidePanel('btn-open-calib', 'panel-calibration');
         this.setupSidePanel('btn-open-summary', 'panel-summary');
-        this.setupSidePanel('btn-open-texture-tuner', 'panel-texture-tuner');
 
         // Modal pomocy i instrukcji
         this.setupHelpModal();
@@ -977,9 +976,6 @@ class ArtbarApp {
 
         // Inicjalizacja Generatora Tła AI (Stable Diffusion)
         this.setupAiGenerator();
-
-        // Inicjalizacja Narzędzia Kalibracji Zgrania Tekstur (Tuner)
-        this.setupTextureTuner();
 
         // ==========================================
         // LOGOTYP / BRANDING NAKŁADKOWY
@@ -1823,170 +1819,6 @@ class ArtbarApp {
                 this.showToast('Pobieranie grafiki AI w wysokiej rozdzielczości...');
             }
         });
-    }
-
-    setupTextureTuner() {
-        const selectModule = document.getElementById('tuner-select-module');
-        const sliderOffsetU = document.getElementById('slider-tuner-offset-u');
-        const inputOffsetU = document.getElementById('input-tuner-offset-u');
-        const valOffsetU = document.getElementById('val-tuner-offset-u');
-
-        const sliderRepeatU = document.getElementById('slider-tuner-repeat-u');
-        const inputRepeatU = document.getElementById('input-tuner-repeat-u');
-        const valRepeatU = document.getElementById('val-tuner-repeat-u');
-
-        const toggleFlipU = document.getElementById('toggle-tuner-flip-u');
-
-        const sliderOffsetV = document.getElementById('slider-tuner-offset-v');
-        const inputOffsetV = document.getElementById('input-tuner-offset-v');
-        const valOffsetV = document.getElementById('val-tuner-offset-v');
-
-        const outputJson = document.getElementById('tuner-output-json');
-        const btnCopy = document.getElementById('btn-tuner-copy');
-        const btnResetCurrent = document.getElementById('btn-tuner-reset-current');
-        const btnResetAll = document.getElementById('btn-tuner-reset-all');
-        const btnOpenTuner = document.getElementById('btn-open-texture-tuner');
-
-        if (!selectModule) return;
-
-        // Jeśli użytkownik otworzy tuner, a tło jest wyłączone, włącz przykładowe tło, aby widzieć efekt
-        btnOpenTuner?.addEventListener('click', () => {
-            if (!this.brandingManager.isBackgroundEnabled || !this.brandingManager.currentBackgroundTexture) {
-                this.brandingManager.setBackgroundPreset('kamienieszlachetne', () => {
-                    const toggle = document.getElementById('toggle-panorama-enable');
-                    if (toggle) toggle.checked = true;
-                    this.showToast('Włączono tło graficzne do kalibracji zgrania.');
-                });
-            }
-        });
-
-        const updateJsonOutput = () => {
-            if (outputJson) {
-                outputJson.value = JSON.stringify(this.brandingManager.textureTuning, null, 2);
-            }
-        };
-
-        const syncUI = (moduleKey) => {
-            const tuning = this.brandingManager.getTextureTuning(moduleKey);
-            const offU = tuning.offsetU !== undefined ? Number(tuning.offsetU) : 0;
-            const repU = tuning.repeatU !== undefined ? Number(tuning.repeatU) : 1;
-            const flip = !!tuning.flipU;
-            const offV = tuning.offsetV !== undefined ? Number(tuning.offsetV) : 0;
-
-            if (sliderOffsetU) sliderOffsetU.value = offU;
-            if (inputOffsetU) inputOffsetU.value = offU.toFixed(3);
-            if (valOffsetU) valOffsetU.textContent = offU.toFixed(3);
-
-            if (sliderRepeatU) sliderRepeatU.value = repU;
-            if (inputRepeatU) inputRepeatU.value = repU.toFixed(3);
-            if (valRepeatU) valRepeatU.textContent = repU.toFixed(3);
-
-            if (toggleFlipU) toggleFlipU.checked = flip;
-
-            if (sliderOffsetV) sliderOffsetV.value = offV;
-            if (inputOffsetV) inputOffsetV.value = offV.toFixed(3);
-            if (valOffsetV) valOffsetV.textContent = offV.toFixed(3);
-
-            updateJsonOutput();
-        };
-
-        // Zmiana wybranego modułu z listy rozwijanej
-        selectModule.addEventListener('change', (e) => {
-            syncUI(e.target.value);
-        });
-
-        // Offset U (poziom)
-        const applyOffsetU = (val) => {
-            const mod = selectModule.value;
-            const num = Math.round(Number(val) * 1000) / 1000;
-            this.brandingManager.setTextureTuning(mod, { offsetU: num });
-            syncUI(mod);
-        };
-
-        sliderOffsetU?.addEventListener('input', (e) => applyOffsetU(e.target.value));
-        inputOffsetU?.addEventListener('change', (e) => applyOffsetU(e.target.value));
-
-        // Repeat U (skala w poziomie)
-        const applyRepeatU = (val) => {
-            const mod = selectModule.value;
-            const num = Math.max(0.1, Math.round(Number(val) * 1000) / 1000);
-            this.brandingManager.setTextureTuning(mod, { repeatU: num });
-            syncUI(mod);
-        };
-
-        sliderRepeatU?.addEventListener('input', (e) => applyRepeatU(e.target.value));
-        inputRepeatU?.addEventListener('change', (e) => applyRepeatU(e.target.value));
-
-        // Flip U (odwrócenie poziome)
-        toggleFlipU?.addEventListener('change', (e) => {
-            const mod = selectModule.value;
-            this.brandingManager.setTextureTuning(mod, { flipU: e.target.checked });
-            syncUI(mod);
-        });
-
-        // Offset V (pion)
-        const applyOffsetV = (val) => {
-            const mod = selectModule.value;
-            const num = Math.round(Number(val) * 1000) / 1000;
-            this.brandingManager.setTextureTuning(mod, { offsetV: num });
-            syncUI(mod);
-        };
-
-        sliderOffsetV?.addEventListener('input', (e) => applyOffsetV(e.target.value));
-        inputOffsetV?.addEventListener('change', (e) => applyOffsetV(e.target.value));
-
-        // Przyciski krokowe (mikro-kroki)
-        document.querySelectorAll('.tuner-step-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.dataset.target;
-                const step = parseFloat(btn.dataset.step) || 0;
-                const mod = selectModule.value;
-                const current = this.brandingManager.getTextureTuning(mod);
-
-                if (target === 'offsetU') {
-                    const currentVal = current.offsetU !== undefined ? Number(current.offsetU) : 0;
-                    applyOffsetU(currentVal + step);
-                } else if (target === 'repeatU') {
-                    const currentVal = current.repeatU !== undefined ? Number(current.repeatU) : 1;
-                    applyRepeatU(currentVal + step);
-                } else if (target === 'offsetV') {
-                    const currentVal = current.offsetV !== undefined ? Number(current.offsetV) : 0;
-                    applyOffsetV(currentVal + step);
-                }
-            });
-        });
-
-        // Kopiowanie JSON do schowka
-        btnCopy?.addEventListener('click', () => {
-            const text = outputJson?.value || JSON.stringify(this.brandingManager.textureTuning, null, 2);
-            navigator.clipboard.writeText(text).then(() => {
-                this.showToast('📋 Parametry skopiowane do schowka!');
-            }).catch(() => {
-                if (outputJson) {
-                    outputJson.select();
-                    document.execCommand('copy');
-                }
-                this.showToast('📋 Parametry skopiowane!');
-            });
-        });
-
-        // Reset dla bieżącego modułu
-        btnResetCurrent?.addEventListener('click', () => {
-            const mod = selectModule.value;
-            this.brandingManager.resetTextureTuning(mod);
-            syncUI(mod);
-            this.showToast(`↺ Zresetowano parametry dla: ${mod}`);
-        });
-
-        // Reset wszystkich modułów
-        btnResetAll?.addEventListener('click', () => {
-            this.brandingManager.resetTextureTuning();
-            syncUI(selectModule.value);
-            this.showToast('↺ Zresetowano parametry wszystkich modułów.');
-        });
-
-        // Inicjalna synchronizacja UI
-        syncUI(selectModule.value);
     }
 
     animate() {

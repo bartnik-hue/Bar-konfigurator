@@ -313,7 +313,7 @@ export class ModelRegistry {
                 }
                 if (child.userData.isCornerFront) {
                     child.geometry = child.geometry.clone();
-                    this.normalizeCornerFrontUVs(child.geometry, true);
+                    this.normalizeCornerFrontUVs(child.geometry);
                 }
                 if (this.isBrandingTarget(child)) {
                     child.userData.isBrandingFront = true;
@@ -361,25 +361,27 @@ export class ModelRegistry {
 
     /**
      * Rozwija i normalizuje współrzędne UV frontu narożnika (dwa skrzydła pod kątem 90°)
-     * wzdłuż pełnego obwodu lica (u od 0.0 na wejściu do 1.0 na wyjściu złącza)
+     * wzdłuż pełnego obwodu lica (u od 0.0 na wejściu do 1.0 na wyjściu złącza).
+     * Uwzględnia wyskalowanie symetrii skrzydła X (scaleX = 0.967842).
      */
-    normalizeCornerFrontUVs(geometry, isMirrored = false) {
+    normalizeCornerFrontUVs(geometry) {
         if (!geometry || !geometry.attributes.position || !geometry.attributes.uv || !geometry.index) return;
         const pos = geometry.attributes.position;
         const uv = geometry.attributes.uv;
         const indices = geometry.index.array;
 
-        // Wymiary narożnika w pliku rog.glb:
-        // Skrzydło 1: od wejścia X = -0.3302 do rogu X = 0.3822 (długość 0.7124m)
-        // Skrzydło 2: od rogu Z = 0.3400 do wyjścia Z = -0.3300 (długość 0.6700m)
+        // Wymiary narożnika w pliku rog.glb po wyskalowaniu symetrii ramion (scaleX = 0.967842):
+        // Skrzydło 1: od wejścia X = -0.3302 do rogu X = 0.3822 (długość fizyczna 0.7124 * 0.967842 = 0.6695m)
+        // Skrzydło 2: od rogu Z = 0.3400 do wyjścia Z = -0.3300 (długość fizyczna 0.6700m)
         const entranceX = -0.3302;
         const cornerX = 0.3822;
         const cornerZ = 0.3400;
         const exitZ = -0.3300;
+        const scaleX = 0.967842;
 
-        const L1 = cornerX - entranceX; // 0.7124m
-        const L2 = cornerZ - exitZ;     // 0.6700m
-        const totalL = L1 + L2;         // 1.3824m
+        const L1 = (cornerX - entranceX) * scaleX; // 0.6695m
+        const L2 = cornerZ - exitZ;                 // 0.6700m
+        const totalL = L1 + L2;                     // 1.3395m
 
         const minY = 0.09708;
         const maxY = 1.20000;
@@ -402,16 +404,14 @@ export class ModelRegistry {
 
             let distAlong = 0;
             if (pz >= 0.33) {
-                distAlong = Math.max(0, Math.min(L1, px - entranceX));
+                distAlong = Math.max(0, Math.min(L1, (px - entranceX) * scaleX));
             } else {
                 const distZ = cornerZ - pz;
                 distAlong = L1 + Math.max(0, Math.min(L2, distZ));
             }
 
-            let u = distAlong / totalL;
-            if (isMirrored) {
-                u = 1.0 - u;
-            }
+            // U biegnie zawsze płynnie od 0.0 na wejściu (gniazdo 'in') do 1.0 na wyjściu (gniazdo 'out')
+            const u = distAlong / totalL;
             const v = Math.max(0, Math.min(1, (py - minY) / spanY));
 
             uv.setXY(idx, u, v);
@@ -479,7 +479,7 @@ export class ModelRegistry {
                     } else {
                         child.material = frontMat;
                     }
-                    this.normalizeCornerFrontUVs(child.geometry, false);
+                    this.normalizeCornerFrontUVs(child.geometry);
                 }
 
                 // Oznacz siatki frontowe dla brandingu

@@ -188,11 +188,11 @@ export class BrandingManager {
                 localIn.set(-0.75, 0.5, 0);
                 localOut.set(0.75, 0.5, 0);
             } else if (m.modelKey === 'BAR_CORNER_RIGHT' || m.modelKey === 'BAR_CORNER') {
-                frontLength = 1.38;
+                frontLength = 1.34;
                 localIn.set(-0.475, 0.5, 0);
                 localOut.set(0, 0.5, -0.475);
             } else if (m.modelKey === 'BAR_CORNER_LEFT') {
-                frontLength = 1.38;
+                frontLength = 1.34;
                 localIn.set(0.475, 0.5, 0);
                 localOut.set(0, 0.5, -0.475);
             }
@@ -457,18 +457,10 @@ export class BrandingManager {
     }
 
     loadTextureTuning() {
+        this.textureTuning = this.getDefaultTextureTuning();
         try {
-            const saved = localStorage.getItem('artbar_texture_tuning');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                this.textureTuning = {
-                    ...this.getDefaultTextureTuning(),
-                    ...parsed
-                };
-            }
-        } catch (e) {
-            console.warn('Nie udało się załadować dostrajania tekstur:', e);
-        }
+            localStorage.removeItem('artbar_texture_tuning');
+        } catch (e) {}
     }
 
     saveTextureTuning() {
