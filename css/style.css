@@ -355,19 +355,20 @@ body, html {
 }
 
 .hud-btn svg.hud-icon {
-    width: 17px;
-    height: 17px;
+    width: 26px;
+    height: 26px;
     flex-shrink: 0;
     fill: none;
-    stroke: currentColor;
+    stroke: var(--primary);
+    color: var(--primary);
     stroke-linecap: round;
     stroke-linejoin: round;
-    transition: transform 0.2s ease, stroke 0.2s ease;
+    transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .hud-btn:hover svg.hud-icon {
-    transform: scale(1.12);
-    stroke: var(--primary);
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 6px rgba(250, 203, 125, 0.6));
 }
 
 .hud-btn:hover {
