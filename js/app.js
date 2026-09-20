@@ -247,13 +247,16 @@ class ArtbarApp {
     }
 
     initEvents() {
-        this.pointerDownPos = { x: 0, y: 0, time: 0 };
+        this.pointerDownPos = { x: 0, y: 0, time: 0, pointerType: 'mouse' };
         this.menuOpenedTime = 0;
+        this.longPressTimer = null;
 
-        // Raycasting myszy
+        // Raycasting myszy i dotyku
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
         this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
         this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
+        this.canvas.addEventListener('pointercancel', (e) => this.onPointerCancel(e));
         this.canvas.addEventListener('contextmenu', (e) => this.onContextMenu(e));
 
         // Klawisze skrótów
@@ -312,15 +315,54 @@ class ArtbarApp {
         }
     }
 
+    onPointerMove(e) {
+        // Jeśli palec przemieścił się o więcej niż 12px, anuluj długie dotknięcie (użytkownik obraca kamerę)
+        if (this.longPressTimer) {
+            const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
+            if (dist > 12) {
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+            }
+        }
+        this.onMouseMove(e);
+    }
+
+    onPointerCancel(e) {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    }
+
     onPointerDown(e) {
-        if (e.button !== 0) return;
+        if (e.button !== 0 && e.pointerType !== 'touch') return;
         if (document.getElementById('modal-help')?.classList.contains('visible')) return;
-        this.pointerDownPos = { x: e.clientX, y: e.clientY, time: performance.now() };
+        this.pointerDownPos = { x: e.clientX, y: e.clientY, time: performance.now(), pointerType: e.pointerType };
+
+        // Obsługa długiego dotknięcia (Long Press) na urządzeniach dotykowych -> symulacja PPM (wstawienie modułu pod palec)
+        if (e.pointerType === 'touch') {
+            if (this.longPressTimer) clearTimeout(this.longPressTimer);
+            if (!e.target.closest('.top-header') && !e.target.closest('.top-actions') && 
+                !e.target.closest('.bottom-controls') && !e.target.closest('.side-panel') && 
+                !e.target.closest('#context-menu') && !e.target.closest('#radial-action-menu') &&
+                !e.target.closest('.modal-overlay')) {
+                
+                this.longPressTimer = setTimeout(() => {
+                    this.onContextMenu(e);
+                    if (navigator.vibrate) navigator.vibrate(35);
+                }, 520);
+            }
+        }
     }
 
     onPointerUp(e) {
-        // Tylko LPM (przycisk 0)
-        if (e.button !== 0) return;
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+
+        // Tylko LPM (przycisk 0) lub dotyk
+        if (e.button !== 0 && e.pointerType !== 'touch') return;
 
         // Jeśli modal pomocy jest otwarty, ignoruj interakcje ze sceną
         if (document.getElementById('modal-help')?.classList.contains('visible')) return;
@@ -333,9 +375,11 @@ class ArtbarApp {
             return;
         }
 
-        // Sprawdź czy to było kliknięcie czy przeciąganie kamery (threshold 8px)
+        // Sprawdź czy to było kliknięcie czy przeciąganie kamery
+        // Na ekranach dotykowych palec ma naturalny mikro-ruch przy tapnięciu, dlatego próg wynosi 22px
+        const threshold = (e.pointerType === 'touch' || this.pointerDownPos.pointerType === 'touch') ? 22 : 8;
         const dist = Math.hypot(e.clientX - this.pointerDownPos.x, e.clientY - this.pointerDownPos.y);
-        if (dist > 8) {
+        if (dist > threshold) {
             return; // Użytkownik obracał kamerę (drag), nie wykonujemy akcji kliknięcia
         }
 
@@ -514,11 +558,11 @@ class ArtbarApp {
             menu.appendChild(row);
         });
 
-        // Pozycja w oknie
-        const menuW = 240;
-        const menuH = 180;
-        const posX = (x + menuW > window.innerWidth) ? window.innerWidth - menuW - 15 : x;
-        const posY = (y + menuH > window.innerHeight) ? window.innerHeight - menuH - 15 : y;
+        // Pozycja w oknie - zabezpieczenie przed wyjściem poza ekran na smartfonach i tabletach
+        const menuW = Math.min(240, window.innerWidth - 20);
+        const menuH = 220;
+        const posX = Math.max(10, Math.min(window.innerWidth - menuW - 10, x));
+        const posY = Math.max(10, Math.min(window.innerHeight - menuH - 10, y));
 
         menu.style.left = `${posX}px`;
         menu.style.top = `${posY}px`;
@@ -574,6 +618,18 @@ class ArtbarApp {
     }
 
     initUI() {
+        // Dostosowanie dymka podpowiedzi dla ekranów dotykowych
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            const hint = document.querySelector('.canvas-hint');
+            if (hint) {
+                hint.innerHTML = `
+                    <strong>Dotknij moduł:</strong> zaznacz i obróć &bull; 
+                    <strong>Dotknij złotej kropki:</strong> dołącz moduł &bull; 
+                    <strong>Przytrzymaj palec na siatce:</strong> wstaw moduł
+                `;
+            }
+        }
+
         // Kalibrator offsetów (Admin Tool)
         const calibContainer = document.getElementById('calibration-container');
         this.calibrationTool = new CalibrationTool(this.registry, this.barBuilder, calibContainer);
@@ -1415,8 +1471,17 @@ class ArtbarApp {
             return;
         }
 
-        const screenX = (projected.x * 0.5 + 0.5) * window.innerWidth;
-        const screenY = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+        const rawX = (projected.x * 0.5 + 0.5) * window.innerWidth;
+        const rawY = (-(projected.y * 0.5) + 0.5) * window.innerHeight;
+
+        // Marginesy ekranowe dostosowane do rozmiaru wyświetlacza (smartfon vs desktop)
+        const isMobile = window.innerWidth <= 768;
+        const marginX = isMobile ? 84 : 105;
+        const marginTop = isMobile ? 120 : 100;
+        const marginBottom = isMobile ? 75 : 85;
+
+        const screenX = Math.max(marginX, Math.min(window.innerWidth - marginX, rawX));
+        const screenY = Math.max(marginTop, Math.min(window.innerHeight - marginBottom, rawY));
 
         menu.style.left = `${screenX}px`;
         menu.style.top = `${screenY}px`;
