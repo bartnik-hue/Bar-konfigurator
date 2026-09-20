@@ -146,9 +146,9 @@ export class ModelRegistry {
 
     async loadAllModels(onProgress) {
         const modelsToLoad = [
-            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb',     label: 'Moduł prosty baru' },
-            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=2',      label: 'Narożnik' },
-            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb',        label: 'Regał zaplecza' }
+            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb?v=4',     label: 'Moduł prosty baru' },
+            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=4',          label: 'Narożnik' },
+            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb?v=4',        label: 'Regał zaplecza' }
         ];
 
         let loadedCount = 0;
@@ -371,7 +371,7 @@ export class ModelRegistry {
         const indices = geometry.index.array;
 
         // Wymiary narożnika w pliku rog.glb po wyskalowaniu symetrii ramion (scaleX = 0.967842):
-        // Skrzydło 1: od wejścia X = -0.3302 do rogu X = 0.3822 (długość fizyczna 0.7124 * 0.967842 = 0.6695m)
+        // Skrzydło 1: od wejścia X = -0.3302 do rogu X = 0.3822 (długość fizyczna 0.7124 * 0.967842 = 0.6895m)
         // Skrzydło 2: od rogu Z = 0.3400 do wyjścia Z = -0.3300 (długość fizyczna 0.6700m)
         const entranceX = -0.3302;
         const cornerX = 0.3822;
@@ -379,16 +379,16 @@ export class ModelRegistry {
         const exitZ = -0.3300;
         const scaleX = 0.967842;
 
-        const L1 = (cornerX - entranceX) * scaleX; // 0.6695m
+        const L1 = (cornerX - entranceX) * scaleX; // 0.6895m
         const L2 = cornerZ - exitZ;                 // 0.6700m
-        const totalL = L1 + L2;                     // 1.3395m
+        const totalL = L1 + L2;                     // 1.3595m
 
         const minY = 0.09708;
         const maxY = 1.20000;
         const spanY = maxY - minY;
 
-        // Zewnętrzne przednie lico narożnika to 24 indeksy (8 trójkątów, od 717 do 741).
-        // Indeksy 741..747 to wewnętrzna ścianka narożnika i pozostają przy materiale konstrukcyjnym 'frame'.
+        // Dla siatki legacy (747 indeksów) przednie lico to 24 indeksy (717 do 741).
+        // Dla nowej siatki z materiałem 'branding' wszystkie indeksy (42) to lico frontu.
         const startIndex = (geometry.index.count === 747) ? 717 : 0;
         const endIndex = (geometry.index.count === 747) ? 741 : geometry.index.count;
         const visited = new Set();
@@ -403,7 +403,7 @@ export class ModelRegistry {
             const pz = pos.getZ(idx);
 
             let distAlong = 0;
-            if (pz >= 0.33) {
+            if (pz >= 0.32) {
                 distAlong = Math.max(0, Math.min(L1, (px - entranceX) * scaleX));
             } else {
                 const distZ = cornerZ - pz;
@@ -425,17 +425,27 @@ export class ModelRegistry {
                 child.castShadow = true;
                 child.receiveShadow = true;
 
-                // Oznacz siatki z materiałem 'front', planszę baru prostego lub lico narożnika dla tła panoramicznego
+                // Oznacz siatki z materiałem 'front', 'branding', planszę baru prostego lub lico narożnika dla tła panoramicznego
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
-                const hasFrontMat = mats.some(m => m && (m.name === 'front' || m.name.toLowerCase().includes('front')));
+                const hasFrontMat = mats.some(m => m && (m.name === 'front' || (m.name || '').toLowerCase().includes('front')));
+                const hasBrandingMat = mats.some(m => m && (m.name || '').toLowerCase().includes('branding'));
 
                 const isFrontBoard = (child.name && (child.name.toLowerCase().includes('plansza') || child.name.toLowerCase().includes('barart.104'))) ||
                                      (child.parent && child.parent.name && child.parent.name.toLowerCase().includes('plansza'));
 
-                const isCornerMesh = (child.name && child.name.toLowerCase().includes('barart.002')) ||
-                                     (child.geometry && child.geometry.index && child.geometry.index.count === 747);
+                const isLegacyCornerMesh = (child.geometry && child.geometry.index && child.geometry.index.count === 747);
 
-                if (hasFrontMat) {
+                if (hasBrandingMat) {
+                    child.userData.isFrontPanel = true;
+                    child.userData.isCornerFront = true;
+                    mats.forEach(m => {
+                        if (m && (m.name || '').toLowerCase().includes('branding')) {
+                            m.name = 'front';
+                            m.side = THREE.DoubleSide;
+                        }
+                    });
+                    this.normalizeCornerFrontUVs(child.geometry);
+                } else if (hasFrontMat) {
                     child.userData.isFrontPanel = true;
                     this.normalizeFrontUVs(child.geometry);
                 } else if (isFrontBoard) {
@@ -457,7 +467,7 @@ export class ModelRegistry {
                         child.material = frontMat;
                     }
                     this.normalizeFrontUVs(child.geometry);
-                } else if (isCornerMesh) {
+                } else if (isLegacyCornerMesh) {
                     child.userData.isFrontPanel = true;
                     child.userData.isCornerFront = true;
                     const origMat = mats[0];
@@ -470,15 +480,11 @@ export class ModelRegistry {
                     // - Indeksy 0..717: korpus, blat i półki narożnika -> materiał 'frame'
                     // - Indeksy 717..741 (24 indeksy / 8 trójkątów): ZEWNĘTRZNE lico narożnika -> materiał 'front'
                     // - Indeksy 741..747 (6 indeksów / 2 trójkąty): WEWNĘTRZNA ścianka narożnika -> materiał 'frame' (brak grafiki wewnątrz)
-                    if (child.geometry && child.geometry.index && child.geometry.index.count === 747) {
-                        child.geometry.clearGroups();
-                        child.geometry.addGroup(0, 717, 0);  // Grupa 0: korpus i blat -> 'frame'
-                        child.geometry.addGroup(717, 24, 1); // Grupa 1: zewnętrzne lico -> 'front'
-                        child.geometry.addGroup(741, 6, 0);  // Grupa 2: wewnętrzna ścianka -> 'frame'
-                        child.material = [origMat, frontMat];
-                    } else {
-                        child.material = frontMat;
-                    }
+                    child.geometry.clearGroups();
+                    child.geometry.addGroup(0, 717, 0);  // Grupa 0: korpus i blat -> 'frame'
+                    child.geometry.addGroup(717, 24, 1); // Grupa 1: zewnętrzne lico -> 'front'
+                    child.geometry.addGroup(741, 6, 0);  // Grupa 2: wewnętrzna ścianka -> 'frame'
+                    child.material = [origMat, frontMat];
                     this.normalizeCornerFrontUVs(child.geometry);
                 }
 

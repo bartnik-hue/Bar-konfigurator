@@ -188,11 +188,11 @@ export class BrandingManager {
                 localIn.set(-0.75, 0.5, 0);
                 localOut.set(0.75, 0.5, 0);
             } else if (m.modelKey === 'BAR_CORNER_RIGHT' || m.modelKey === 'BAR_CORNER') {
-                frontLength = 1.34;
+                frontLength = 1.36;
                 localIn.set(-0.475, 0.5, 0);
                 localOut.set(0, 0.5, -0.475);
             } else if (m.modelKey === 'BAR_CORNER_LEFT') {
-                frontLength = 1.34;
+                frontLength = 1.36;
                 localIn.set(0.475, 0.5, 0);
                 localOut.set(0, 0.5, -0.475);
             }
@@ -361,7 +361,11 @@ export class BrandingManager {
             if (child.isMesh && child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(mat => {
-                    const isFrontMat = mat && (mat.name === 'front' || (!Array.isArray(child.material) && child.userData.isFrontPanel));
+                    const isFrontMat = mat && (
+                        mat.name === 'front' ||
+                        (mat.name && mat.name.toLowerCase().includes('branding')) ||
+                        (!Array.isArray(child.material) && (child.userData.isFrontPanel || child.userData.isCornerFront))
+                    );
                     if (isFrontMat) {
                         // Zapisz oryginalną fabryczną teksturę i kolor
                         if (!this.defaultFrontTextures.has(moduleData.id)) {
@@ -430,7 +434,11 @@ export class BrandingManager {
             if (child.isMesh && child.material) {
                 const mats = Array.isArray(child.material) ? child.material : [child.material];
                 mats.forEach(mat => {
-                    const isFrontMat = mat && (mat.name === 'front' || (!Array.isArray(child.material) && child.userData.isFrontPanel));
+                    const isFrontMat = mat && (
+                        mat.name === 'front' ||
+                        (mat.name && mat.name.toLowerCase().includes('branding')) ||
+                        (!Array.isArray(child.material) && (child.userData.isFrontPanel || child.userData.isCornerFront))
+                    );
                     if (isFrontMat) {
                         const def = this.defaultFrontTextures.get(moduleData.id);
                         mat.map = def ? (def.map || null) : null;
