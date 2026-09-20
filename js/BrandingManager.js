@@ -126,6 +126,7 @@ export class BrandingManager {
             texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.ClampToEdgeWrapping;
             texture.flipY = true;
+            texture.anisotropy = 16;
             this.currentBackgroundTexture = texture;
             if (onReady) onReady(texture);
         });
@@ -387,6 +388,7 @@ export class BrandingManager {
                                 texClone = sharedTex.clone();
                                 texClone.wrapS = THREE.RepeatWrapping;
                                 texClone.wrapT = THREE.ClampToEdgeWrapping;
+                                texClone.anisotropy = 16;
                                 mat.map = texClone;
                             }
 

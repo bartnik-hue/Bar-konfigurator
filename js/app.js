@@ -79,7 +79,8 @@ class ArtbarApp {
         this.renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
             antialias: true,
-            powerPreference: 'high-performance'
+            powerPreference: 'high-performance',
+            logarithmicDepthBuffer: true
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -91,7 +92,7 @@ class ArtbarApp {
         // Kontroler kamery OrbitControls
         this.controls = new OrbitControls(this.camera, this.canvas);
         this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
+        this.controls.dampingFactor = 0.08;
         this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Nie pozwól zajrzeć pod podłogę
         this.controls.minDistance = 2.0;
         this.controls.maxDistance = 40.0;
