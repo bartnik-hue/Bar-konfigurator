@@ -753,10 +753,14 @@ class ArtbarApp {
         // Wybór trybu mapowania (ciągły pas vs powtarzanie modułu)
         const btnModeChain = document.getElementById('btn-mode-chain');
         const btnModeRepeat = document.getElementById('btn-mode-repeat');
+        const sliderPanoSpan = document.getElementById('slider-panorama-span');
+        const valPanoSpan = document.getElementById('val-panorama-span');
+        const rowPanoSpan = document.getElementById('row-panorama-span');
 
         btnModeChain?.addEventListener('click', () => {
             btnModeChain.classList.add('active');
             btnModeRepeat?.classList.remove('active');
+            if (rowPanoSpan) rowPanoSpan.style.display = 'flex';
             this.brandingManager.setBackgroundMode('chain');
             this.showToast('Tryb tła: Ciągły pas (płynna panorama na całym ciągu baru).');
         });
@@ -764,8 +768,15 @@ class ArtbarApp {
         btnModeRepeat?.addEventListener('click', () => {
             btnModeRepeat.classList.add('active');
             btnModeChain?.classList.remove('active');
+            if (rowPanoSpan) rowPanoSpan.style.display = 'none';
             this.brandingManager.setBackgroundMode('repeat');
             this.showToast('Tryb tła: Powtarzaj pełną grafikę na każdym module.');
+        });
+
+        sliderPanoSpan?.addEventListener('input', (e) => {
+            const span = parseInt(e.target.value, 10);
+            if (valPanoSpan) valPanoSpan.textContent = `${span} barów (${(span * 1.5).toFixed(1)} m)`;
+            this.brandingManager.setBackgroundSpan(span);
         });
 
         // Wybór z gotowych wzorów (karty miniatur)
@@ -830,9 +841,15 @@ class ArtbarApp {
             if (bg.mode === 'chain') {
                 btnModeChain?.classList.add('active');
                 btnModeRepeat?.classList.remove('active');
+                if (rowPanoSpan) rowPanoSpan.style.display = 'flex';
             } else {
                 btnModeRepeat?.classList.add('active');
                 btnModeChain?.classList.remove('active');
+                if (rowPanoSpan) rowPanoSpan.style.display = 'none';
+            }
+            if (sliderPanoSpan && bg.spanModules) {
+                sliderPanoSpan.value = bg.spanModules;
+                if (valPanoSpan) valPanoSpan.textContent = `${bg.spanModules} barów (${(bg.spanModules * 1.5).toFixed(1)} m)`;
             }
         };
 

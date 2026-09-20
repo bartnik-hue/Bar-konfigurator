@@ -29,7 +29,8 @@ export class BrandingManager {
         this.currentBackgroundUrl = null;
         this.currentBackgroundTexture = null;
         this.activePresetId = null;
-        this.backgroundMode = 'chain'; // 'chain' (ciągła panorama na ciągu) | 'repeat' (każdy moduł ma całą)
+        this.backgroundMode = 'chain'; // 'chain' (ciągły pas o stałej długości) | 'repeat' (każdy moduł ma całą)
+        this.backgroundSpanModules = 5; // Domyślna długość grafiki: 5 barów (7.5m)
         this.defaultFrontTextures = new Map(); // id modułu -> domyślna tekstura plastiku
 
         // ==========================================
@@ -99,12 +100,18 @@ export class BrandingManager {
     loadBackgroundTexture(url, onReady = null) {
         this.textureLoader.load(url, (texture) => {
             texture.colorSpace = THREE.SRGBColorSpace;
-            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapS = THREE.RepeatWrapping;
             texture.wrapT = THREE.ClampToEdgeWrapping;
             texture.flipY = true;
             this.currentBackgroundTexture = texture;
             if (onReady) onReady(texture);
         });
+    }
+
+    setBackgroundSpan(modulesCount) {
+        this.backgroundSpanModules = Math.max(1, Math.min(20, parseInt(modulesCount, 10) || 5));
+        this.updateFrontPanoramas();
+        this.notifyBackgroundChanged();
     }
 
     setBackgroundEnabled(enabled) {
@@ -249,9 +256,16 @@ export class BrandingManager {
                         if (this.isBackgroundEnabled && sharedTex) {
                             // Sklonuj teksturę dla tego konkretnego modułu, aby nadać unikalny repeat i offset
                             const texClone = sharedTex.clone();
-                            if (this.backgroundMode === 'chain' && chainLength > 1) {
-                                texClone.repeat.set(1 / chainLength, 1);
-                                texClone.offset.set(indexInChain / chainLength, 0);
+                            texClone.wrapS = THREE.RepeatWrapping;
+                            texClone.wrapT = THREE.ClampToEdgeWrapping;
+
+                            const span = this.backgroundSpanModules || 5;
+                            if (this.backgroundMode === 'chain') {
+                                // Grafika o stałej długości (np. 5 barów):
+                                // Każdy bar ma stałą 1/span szerokości wzoru (brak rozciągania/ściskania)
+                                // a po przekroczeniu pełnej długości (5 barów) płynnie się powtarza
+                                texClone.repeat.set(1 / span, 1);
+                                texClone.offset.set((indexInChain / span) % 1, 0);
                             } else {
                                 texClone.repeat.set(1, 1);
                                 texClone.offset.set(0, 0);
@@ -293,7 +307,8 @@ export class BrandingManager {
                 enabled: this.isBackgroundEnabled,
                 url: this.currentBackgroundUrl,
                 presetId: this.activePresetId,
-                mode: this.backgroundMode
+                mode: this.backgroundMode,
+                spanModules: this.backgroundSpanModules
             });
         }
     }
@@ -516,7 +531,8 @@ export class BrandingManager {
                 enabled: this.isBackgroundEnabled,
                 url: this.currentBackgroundUrl,
                 presetId: this.activePresetId,
-                mode: this.backgroundMode
+                mode: this.backgroundMode,
+                spanModules: this.backgroundSpanModules
             },
             logo: {
                 baseWidth: this.baseWidth,
@@ -538,6 +554,7 @@ export class BrandingManager {
             const bg = settings.background;
             this.backgroundMode = bg.mode || 'chain';
             this.activePresetId = bg.presetId || null;
+            if (bg.spanModules !== undefined) this.backgroundSpanModules = bg.spanModules;
             if (bg.url) {
                 this.currentBackgroundUrl = bg.url;
                 this.loadBackgroundTexture(bg.url, (tex) => {

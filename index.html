@@ -245,6 +245,15 @@
                     </button>
                 </div>
 
+                <!-- Długość wzoru w modułach (domyślnie 5 barów) -->
+                <div class="scene-control-row" id="row-panorama-span" style="margin: 6px 0 8px 0;">
+                    <div class="scene-label-val">
+                        <span>Długość grafiki:</span>
+                        <strong id="val-panorama-span">5 barów (7.5 m)</strong>
+                    </div>
+                    <input type="range" id="slider-panorama-span" min="1" max="10" step="1" value="5" class="scene-slider" title="Liczba modułów baru, na jaką przypada 1 pełna długość grafiki (domyślnie 5 barów)">
+                </div>
+
                 <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-main); margin-top: 6px;">
                     Wybierz gotowy wzór z katalogu:
                 </div>
@@ -495,6 +504,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=33"></script>
+    <script type="module" src="js/app.js?v=34"></script>
 </body>
 </html>
