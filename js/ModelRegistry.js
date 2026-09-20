@@ -105,7 +105,7 @@ export class ModelRegistry {
 
     loadPlaceholderTexture() {
         const texLoader = new THREE.TextureLoader();
-        texLoader.load('/wzor/dlugi alpha0001.png', (tex) => {
+        texLoader.load('wzor/dlugi alpha0001.png', (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
             this.placeholderLogoTexture = tex;
             if (!this.activeLogoTexture) {
@@ -138,9 +138,9 @@ export class ModelRegistry {
 
     async loadAllModels(onProgress) {
         const modelsToLoad = [
-            { key: 'BAR_STRAIGHT', url: '/MODELE/BarModel.glb',     label: 'Moduł prosty baru' },
-            { key: 'RAW_CORNER',   url: '/MODELE/rog.glb?v=2',      label: 'Narożnik' },
-            { key: 'BACK_SHELF',   url: '/MODELE/regal.glb',        label: 'Regał zaplecza' }
+            { key: 'BAR_STRAIGHT', url: 'MODELE/BarModel.glb',     label: 'Moduł prosty baru' },
+            { key: 'RAW_CORNER',   url: 'MODELE/rog.glb?v=2',      label: 'Narożnik' },
+            { key: 'BACK_SHELF',   url: 'MODELE/regal.glb',        label: 'Regał zaplecza' }
         ];
 
         let loadedCount = 0;
