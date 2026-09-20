@@ -248,6 +248,58 @@
                     <button class="btn-tool" id="btn-reset-branding" style="flex: 1; justify-content: center;">Resetuj</button>
                 </div>
             </div>
+
+            <!-- KONTROLKI SKALI I ROZMIARU BRANDINGU -->
+            <div class="scene-group" id="branding-adjust-controls" style="display: none; margin-top: 12px;">
+                <div class="scene-group-title" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Dopasowanie grafiki</span>
+                    <button class="btn-micro" id="btn-auto-aspect" title="Dopasuj rozmiar do oryginalnych proporcji pliku graficznego">Auto-proporcje</button>
+                </div>
+
+                <!-- Skala ogólna -->
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Skala:</span>
+                        <strong id="val-branding-scale">100%</strong>
+                    </div>
+                    <input type="range" id="slider-branding-scale" min="20" max="250" step="1" value="100" class="scene-slider">
+                </div>
+
+                <!-- Blokada proporcji checkbox -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin: 4px 0;">
+                    <label for="toggle-branding-lock-aspect" style="font-size: 0.76rem; color: var(--text-muted); cursor: pointer;">
+                        Zablokuj proporcje (AR)
+                    </label>
+                    <input type="checkbox" id="toggle-branding-lock-aspect" checked style="accent-color: var(--primary); cursor: pointer;">
+                </div>
+
+                <!-- Szerokość -->
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Szerokość:</span>
+                        <strong id="val-branding-width">1.20 m</strong>
+                    </div>
+                    <input type="range" id="slider-branding-width" min="0.20" max="1.45" step="0.01" value="1.20" class="scene-slider">
+                </div>
+
+                <!-- Wysokość -->
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Wysokość:</span>
+                        <strong id="val-branding-height">0.45 m</strong>
+                    </div>
+                    <input type="range" id="slider-branding-height" min="0.10" max="0.75" step="0.01" value="0.45" class="scene-slider">
+                </div>
+
+                <!-- Pozycja pionowa Y -->
+                <div class="scene-control-row">
+                    <div class="scene-label-val">
+                        <span>Wysokość na barze (Pion):</span>
+                        <strong id="val-branding-posy">0.55 m</strong>
+                    </div>
+                    <input type="range" id="slider-branding-posy" min="0.25" max="0.85" step="0.01" value="0.55" class="scene-slider">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -367,6 +419,6 @@
     <div id="toast-container"></div>
 
     <!-- GŁÓWNY SKRYPT APLIKACJI -->
-    <script type="module" src="js/app.js?v=30"></script>
+    <script type="module" src="js/app.js?v=31"></script>
 </body>
 </html>

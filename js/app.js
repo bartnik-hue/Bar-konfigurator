@@ -644,7 +644,8 @@ class ArtbarApp {
         // Zapis konfiguracji układu z bitmapą do pliku JSON
         document.getElementById('btn-save-project').addEventListener('click', () => {
             try {
-                const projectData = this.barBuilder.exportProject(this.brandingManager.currentDataUrl);
+                const brandingSettings = this.brandingManager.getSettings();
+                const projectData = this.barBuilder.exportProject(this.brandingManager.currentDataUrl, brandingSettings);
                 const jsonStr = JSON.stringify(projectData, null, 2);
                 const blob = new Blob([jsonStr], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -683,12 +684,18 @@ class ArtbarApp {
             reader.onload = (event) => {
                 try {
                     const projectData = JSON.parse(event.target.result);
-                    const savedBitmap = this.barBuilder.importProject(projectData);
+                    const imported = this.barBuilder.importProject(projectData);
+                    const savedBitmap = (typeof imported === 'string') ? imported : imported?.brandingDataUrl;
+                    const savedSettings = (typeof imported === 'object') ? imported?.brandingSettings : null;
 
                     if (savedBitmap) {
                         this.brandingManager.loadGraphicFromDataUrl(savedBitmap, (dataUrl) => {
+                            if (savedSettings) {
+                                this.brandingManager.applySettings(savedSettings);
+                            }
                             document.getElementById('branding-preview-img').src = dataUrl;
                             document.getElementById('branding-preview-box').style.display = 'flex';
+                            document.getElementById('branding-adjust-controls').style.display = 'block';
                             const toggle = document.getElementById('branding-enable-toggle');
                             if (toggle) toggle.checked = true;
                             this.brandingManager.setEnabled(true);
@@ -700,6 +707,7 @@ class ArtbarApp {
                         if (toggle) toggle.checked = false;
                         this.brandingManager.setEnabled(false);
                         document.getElementById('branding-preview-box').style.display = 'none';
+                        document.getElementById('branding-adjust-controls').style.display = 'none';
                         this.showToast('Układ baru został pomyślnie wczytany!');
                     }
                 } catch (err) {
@@ -778,7 +786,69 @@ class ArtbarApp {
         document.getElementById('btn-reset-branding').addEventListener('click', () => {
             this.brandingManager.resetBranding();
             document.getElementById('branding-preview-box').style.display = 'none';
+            const adjustControls = document.getElementById('branding-adjust-controls');
+            if (adjustControls) adjustControls.style.display = 'none';
             this.showToast('Przywrócono domyślny wzór frontów.');
+        });
+
+        // Kontrolki dopasowania i skali brandingu
+        const sliderScale = document.getElementById('slider-branding-scale');
+        const valScale = document.getElementById('val-branding-scale');
+        const sliderWidth = document.getElementById('slider-branding-width');
+        const valWidth = document.getElementById('val-branding-width');
+        const sliderHeight = document.getElementById('slider-branding-height');
+        const valHeight = document.getElementById('val-branding-height');
+        const sliderPosY = document.getElementById('slider-branding-posy');
+        const valPosY = document.getElementById('val-branding-posy');
+        const toggleLockAspect = document.getElementById('toggle-branding-lock-aspect');
+        const btnAutoAspect = document.getElementById('btn-auto-aspect');
+
+        // Callback synchronizacji suwaków z modelem danych
+        this.brandingManager.onDimensionsChanged = (dims) => {
+            if (sliderScale && valScale) {
+                sliderScale.value = dims.scale;
+                valScale.textContent = `${dims.scale}%`;
+            }
+            if (sliderWidth && valWidth) {
+                sliderWidth.value = dims.width.toFixed(2);
+                valWidth.textContent = `${dims.width.toFixed(2)} m`;
+            }
+            if (sliderHeight && valHeight) {
+                sliderHeight.value = dims.height.toFixed(2);
+                valHeight.textContent = `${dims.height.toFixed(2)} m`;
+            }
+            if (sliderPosY && valPosY) {
+                sliderPosY.value = dims.offsetY.toFixed(2);
+                valPosY.textContent = `${dims.offsetY.toFixed(2)} m`;
+            }
+            if (toggleLockAspect) {
+                toggleLockAspect.checked = dims.lockAspect;
+            }
+        };
+
+        sliderScale?.addEventListener('input', (e) => {
+            this.brandingManager.setScale(parseFloat(e.target.value));
+        });
+
+        sliderWidth?.addEventListener('input', (e) => {
+            this.brandingManager.setWidth(parseFloat(e.target.value));
+        });
+
+        sliderHeight?.addEventListener('input', (e) => {
+            this.brandingManager.setHeight(parseFloat(e.target.value));
+        });
+
+        sliderPosY?.addEventListener('input', (e) => {
+            this.brandingManager.setOffsetY(parseFloat(e.target.value));
+        });
+
+        toggleLockAspect?.addEventListener('change', (e) => {
+            this.brandingManager.setLockAspect(e.target.checked);
+        });
+
+        btnAutoAspect?.addEventListener('click', () => {
+            this.brandingManager.resetAspect();
+            this.showToast('Dopasowano rozmiar do oryginalnych proporcji pliku graficznego.');
         });
 
         // Ustawienia Sceny (Tło, Światło, Kierunek)
@@ -843,6 +913,8 @@ class ArtbarApp {
         this.brandingManager.loadGraphicFromFile(file, (dataUrl) => {
             document.getElementById('branding-preview-img').src = dataUrl;
             document.getElementById('branding-preview-box').style.display = 'flex';
+            const adjustControls = document.getElementById('branding-adjust-controls');
+            if (adjustControls) adjustControls.style.display = 'block';
             const toggle = document.getElementById('branding-enable-toggle');
             if (toggle && !toggle.checked) {
                 toggle.checked = true;

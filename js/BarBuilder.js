@@ -112,12 +112,13 @@ export class BarBuilder {
     /**
      * Eksportuje stan układu wraz z bitmapą do obiektu JSON
      */
-    exportProject(brandingDataUrl = null) {
+    exportProject(brandingDataUrl = null, brandingSettings = null) {
         return {
             app: 'ArtbarConfigurator',
             version: '1.0',
             savedAt: new Date().toISOString(),
             brandingDataUrl: brandingDataUrl,
+            brandingSettings: brandingSettings,
             modules: this.modules.map(m => ({
                 id: m.id,
                 modelKey: m.modelKey,
@@ -147,7 +148,10 @@ export class BarBuilder {
         });
 
         this.notifyChange();
-        return projectData.brandingDataUrl;
+        return {
+            brandingDataUrl: projectData.brandingDataUrl || null,
+            brandingSettings: projectData.brandingSettings || null
+        };
     }
 
     /**
